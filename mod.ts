@@ -2,7 +2,7 @@
 
 /**
  *
- * 	v0.0.4
+ * 	v0.0.5
  *
  * 	Nano — a very simple (semi) logic-less template engine. This was initially
  * 	made for playing around with simple prototypes deployed with Deno Deploy,
@@ -195,7 +195,7 @@ export function parse(marks: Mark[]): Node[] {
 	const RE_VARIABLE_IN_QUOTES = /^['"].+?['"]$/;
 	const RE_VARIABLE_BRACKET_NOTATION = /\[['"]/;
 	const RE_VARIABLE_DIGIT = /^-?(\d|\.\d)+$/;
-	const RE_VARIABLE_VALID = /^[0-9a-zA-Z_]*$/;
+	const RE_VARIABLE_VALID = /^[0-9a-zA-Z_$]*$/;
 	const RE_METHOD_INVALID = /[\- ]/;
 	const RE_KEYWORD_IF = /^if /;
 	const RE_KEYWORD_FOR = /^for | in /;
