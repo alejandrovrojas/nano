@@ -2,7 +2,7 @@
 
 /**
  *
- * 	v0.0.5
+ * 	v0.0.6
  *
  * 	Nano — a very simple (semi) logic-less template engine. This was initially
  * 	made for playing around with simple prototypes deployed with Deno Deploy,
@@ -495,7 +495,7 @@ type NanoOptions = {
 	import_path?: string;
 };
 
-export async function compile(nodes: Node[], input_data: InputData, input_methods?: InputMethods, input_options?: NanoOptions): Promise<string> {
+export async function compile(nodes: Node[], input_data: InputData = {}, input_methods: InputMethods = {}, input_options?: NanoOptions): Promise<string> {
 	const default_options: NanoOptions = { show_comments: false, import_path: '' };
 	const compile_options: NanoOptions = { ...default_options, ...input_options };
 
@@ -507,17 +507,16 @@ export async function compile(nodes: Node[], input_data: InputData, input_method
 
 	function return_value(properties: string[]): any {
 		return properties.reduce((parent: any, property: string) => {
-			if (parent[property] === undefined) {
-				throw new NanoError(`Variable "${property}" is undefined`);
+			if (parent[property] !== undefined) {
+				return parent[property];
 			}
-			return parent[property];
 		}, input_data);
 	}
 
 	function return_value_filtered(properties: string[], filters: InputMethods): any {
 		const variable_value = return_value(properties);
 		const filtered_value = filters.reduce((processed_value: any, filter: string) => {
-			if (input_methods === undefined || input_methods[filter] === undefined) {
+			if (input_methods[filter] === undefined) {
 				throw new NanoError(`Method "${filter}" is undefined`);
 			}
 			return input_methods[filter](processed_value);
