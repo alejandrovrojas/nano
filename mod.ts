@@ -2,7 +2,7 @@
 
 /**
  *
- * 	v0.0.7
+ * 	v0.0.8
  *
  * 	Nano is a very simple (almost) logic-less template engine. This was initially
  * 	made for playing around with simple prototypes deployed with Deno Deploy,
@@ -257,6 +257,7 @@ export function parse(marks: Mark[]): Node[] {
 	const RE_ACCESS_DOT = /\./;
 	const RE_ACCESS_BRACKET = /\[["']|['"]\]/;
 	const RE_VARIABLE_EXPRESSION_LIKE = /[\&\|\<\>\+\-\=\!\{\}\,]/;
+	const RE_VARIABLE_EMPTY = /^['"]['"]$/;
 	const RE_VARIABLE_IN_QUOTES = /^['"].+?['"]$/;
 	const RE_VARIABLE_BRACKET_NOTATION = /\[['"]/;
 	const RE_VARIABLE_DIGIT = /^-?(\d|\.\d)+$/;
@@ -309,7 +310,7 @@ export function parse(marks: Mark[]): Node[] {
 		const variable_parts = value_string.split(RE_ACCESS_DOT);
 
 		for (const part of variable_parts) {
-			if (!RE_VARIABLE_VALID.test(part)) {
+			if (!RE_VARIABLE_EMPTY.test(part) && !RE_VARIABLE_VALID.test(part)) {
 				throw new NanoError(`Invalid variable name: "${value_string}"`);
 			}
 		}
