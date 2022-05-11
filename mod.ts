@@ -2,20 +2,61 @@
 
 /**
  *
- * 	v0.0.6
+ * 	v0.0.7
  *
- * 	Nano — a very simple (semi) logic-less template engine. This was initially
+ * 	Nano is a very simple (almost) logic-less template engine. This was initially
  * 	made for playing around with simple prototypes deployed with Deno Deploy,
- * 	which currently doesn't play very well with template engines that rely
- * 	on evaluating expressions at runtime. Nano currently supports logical
- * 	expressions but only with defined variables. Nano has support for all
- * 	the basics like if/for statements, nested loops, filters, and imports.
- * 	Nano inherits its syntax from the most commonly known template engines
- * 	like Django, Twig, etc.
+ * 	which currently doesn't play well with template engines that rely on eval()
+ * 	for evaluating expressions at runtime. Nano currently supports logical
+ * 	expressions but only using variables declared during the rendering phase.
+ * 	Nano has support for all the basics like if/elseif/else/for statements,
+ * 	nested loops, filters, and imports. Nano inherits its syntax from the most
+ * 	commonly known template engines like Django, Twig, etc. See examples below.
  *
- * 	|	should have
- * 	|		[ ] write proper mark/node types zzZzZzZzz...
+ * 	USAGE
+ * 	|	const template 	=	<div>Hello {{ name | shout }}</div>
+ * 	|	const data     	=	{ name: "Alejandro" }
+ * 	|	const filters  	=	{ shout: value => value + '!' }
+ * 	|	const options  	=	{}
+ * 	|
+ * 	|	const rendered 	=	await render(template, data, filters, options)
+ * 	|	const result   	=	<div>Hello Alejandro!</div>
+ *
+ * 	OPTIONS
+ * 	|	show_comments  	=	false		whether to include {# comments #} in output
+ * 	|	import_path    	=	''   		path to prepend to filepath in {% import 'filepath' %}
+ *
+ * 	EXAMPLES
+ * 	|	{% for item, index in array_like | unique %}
+ * 	|		{{ item.a | lowercase }}
+ * 	|	{% endfor %}
+ * 	|
+ * 	|	{% for key, value in object_like | filtered | sorted %}
+ * 	|		{{ value['nested']['property'] | uppercase }}
+ * 	|	{% endfor %}
+ * 	|
+ * 	|	{# comments #}
+ * 	|
+ * 	|	{% if a %}
+ * 	|		{{ import 'a.html' }}
+ * 	|	{% elseif b %}
+ * 	|		{{ import 'b.html' }}
+ * 	|	{% else %}
+ * 	|		{{ import 'c.html' }}
+ * 	|	{% endif %}
+ * 	|
+ * 	|	{% for i in rows %}
+ * 	|		{% for j in columns %}
+ * 	|			<div>{{ i }} {{ j }}</div>
+ * 	|		{% endfor %}
+ * 	|	{% endfor %}
+ *
+ * 	INB4
+ * 	|	will have
+ * 	|		[ ] import with scoped props {{ import 'file.html' with { new_variable: other.variable } }}
  * 	|	could have
+ * 	|		[ ] function syntax for filters
+ * 	|		[ ] proper mark/node types zzZzZzZzz...
  * 	|		[ ] binary expressions and groups: == != >, >=, <, <= ( )
  * 	|	won't have
  * 	|		[x] inline variable definitions {{ [1, 2, 2, 3] | unique }}
@@ -49,10 +90,10 @@ class Mark {
 	value: string;
 	marks: Mark[];
 
-	constructor(type: string, value: string) {
+	constructor(type: string, value: string, marks: Mark[] = []) {
 		this.type = type;
 		this.value = value;
-		this.marks = [];
+		this.marks = marks;
 	}
 }
 
@@ -70,9 +111,12 @@ export function scan(input: string): Mark[] {
 	const RE_TAG = /^{{.*?}}$/;
 	const RE_COMMENT = /^{#[^]*?#}$/;
 	const RE_ALL = /({%.*?%}|{{.*?}}|{#[^]*?#})/;
+	const RE_STACK_BLOCK_TAG = /^\bif\b|^\bfor\b/;
+	const RE_VALID_BLOCK_TAG = /^\bif\b|^\bfor\b|^\belseif\b|^\belse\b/;
 
 	const marks: Mark[] = [];
-	const block_stack: Mark[] = [];
+	const mark_stack: Mark[] = [];
+	const operation_stack: string[] = [];
 	const tokens: Token[] = input.split(RE_ALL).filter(v => v);
 
 	for (const token of tokens) {
@@ -81,45 +125,66 @@ export function scan(input: string): Mark[] {
 
 		if (mark_type === MARK_TYPES[0]) {
 			if (mark_value.startsWith('end')) {
-				const end_statement_type = mark_value.slice(3); //endif -> if
-				let last_block = block_stack.pop() as Mark;
+				let last_in_stack = mark_stack.pop() as Mark;
 
-				if (last_block && last_block.value === 'else') {
-					/**
-					 * 	first push the else-mark to the stack to keep its value
-					 * 	nested in the if-block and then skip to the next mark
-					 * 	which has to be an if statement, otherwise a statement
-					 * 	mismatch will occur throwing a syntax error
-					 **/
+				const last_operation = operation_stack.pop();
+				const end_statement = mark_value.slice(3);
 
-					output_mark(last_block);
-					last_block = block_stack.pop() as Mark;
+				if (!RE_VALID_BLOCK_TAG.test(end_statement)) {
+					throw new NanoError(`Invalid {% ${mark_value} %} tag`);
 				}
 
-				if (!last_block) {
-					throw new NanoError('Too many closing tags');
+				if (!last_operation) {
+					throw new NanoError(`Redundant {% ${mark_value} %} tag`);
+				} else {
+					const last_operation_statement = last_operation.match(RE_STACK_BLOCK_TAG);
+
+					if (last_operation_statement && last_operation_statement.pop() !== end_statement) {
+						throw new NanoError(`Invalid {% ${last_operation} %} statement`);
+					}
 				}
 
-				if (!last_block.value.startsWith(end_statement_type)) {
-					throw new NanoError('Invalid closing tag');
-				}
-
-				output_mark(last_block);
+				traverse_mark_stack(last_in_stack, mark_type);
 			} else {
-				block_stack.push(new Mark(mark_type, mark_value));
+				if (!RE_VALID_BLOCK_TAG.test(mark_value)) {
+					throw new NanoError(`Invalid {% ${mark_value} %} statement`)
+				}
+
+				if (RE_STACK_BLOCK_TAG.test(mark_value)) {
+					operation_stack.push(mark_value)
+				}
+
+				mark_stack.push(new Mark(mark_type, mark_value));
 			}
 		} else {
 			output_mark(new Mark(mark_type, mark_value));
 		}
 	}
 
-	if (block_stack.length > 0) {
-		throw new NanoError('Missing closing tag');
+	if (mark_stack.length > 0) {
+		throw new NanoError(`Missing end tag inside {% ${mark_stack[0].value} %} block`);
+	}
+
+	function traverse_mark_stack(last_in_stack: Mark, mark_type: string) {
+		if (last_in_stack.value.startsWith('elseif')) {
+			const else_mark = new Mark(mark_type, 'else');
+			const if_mark = new Mark(mark_type, last_in_stack.value.slice(4), last_in_stack.marks);
+
+			mark_stack.push(else_mark);
+			output_mark(if_mark);
+		} else {
+			output_mark(last_in_stack);
+		}
+
+		if (last_in_stack.value.startsWith('else')) {
+			last_in_stack = mark_stack.pop() as Mark;
+			traverse_mark_stack(last_in_stack, mark_type);
+		}
 	}
 
 	function output_mark(mark: Mark) {
-		if (block_stack.length > 0) {
-			block_stack[block_stack.length - 1].marks.push(mark);
+		if (mark_stack.length > 0) {
+			mark_stack[mark_stack.length - 1].marks.push(mark);
 		} else {
 			marks.push(mark);
 		}
@@ -411,7 +476,7 @@ export function parse(marks: Mark[]): Node[] {
 			return parse_block_for_mark(mark);
 		}
 
-		throw new NanoError('Invalid block statement');
+		throw new NanoError(`Invalid {% ${mark.value} %} block`);
 	}
 
 	function parse_tag_import(mark: Mark): Node {
