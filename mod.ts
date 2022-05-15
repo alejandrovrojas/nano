@@ -2,7 +2,7 @@
 
 /**
  *
- * 	v0.0.8
+ * 	v0.0.9
  *
  * 	Nano is a very simple (almost) logic-less template engine. This was initially
  * 	made for playing around with simple prototypes deployed with Deno Deploy,
@@ -14,17 +14,20 @@
  * 	commonly known template engines like Django, Twig, etc. See examples below.
  *
  * 	USAGE
- * 	|	const template 	=	<div>Hello {{ name | shout }}</div>
- * 	|	const data     	=	{ name: "Alejandro" }
- * 	|	const filters  	=	{ shout: value => value + '!' }
- * 	|	const options  	=	{}
+ * 	|	const template  =  <div>Hello {{ name | shout }}</div>
+ * 	|	const data      =  { name: "Alejandro" }
+ * 	|	const filters   =  { shout: value => value + '!' }
+ * 	|	const options   =  {}
  * 	|
- * 	|	const rendered 	=	await render(template, data, filters, options)
- * 	|	const result   	=	<div>Hello Alejandro!</div>
+ * 	|	>  await render(template, data, filters, options)
+ * 	|	>  <div>Hello Alejandro!</div>
  *
  * 	OPTIONS
- * 	|	show_comments  	=	false		whether to include {# comments #} in output
- * 	|	import_path    	=	''   		path to prepend to filepath in {% import 'filepath' %}
+ * 	|	show_comments (default: false)	| whether to include {# comments #}
+ * 	|	                              	| in the rendered output
+ * 	|
+ * 	|	import_path   (default: '')   	| path to prepend to filepath
+ * 	|	                              	| in {% import 'filepath' %}
  *
  * 	EXAMPLES
  * 	|	{% for item, index in array_like | unique %}
@@ -38,24 +41,23 @@
  * 	|	{# comments #}
  * 	|
  * 	|	{% if a %}
- * 	|		{{ import 'a.html' }}
+ * 	|		{{ import 'a.html' with { scoped: a } }}
  * 	|	{% elseif b %}
- * 	|		{{ import 'b.html' }}
+ * 	|		{{ import 'b.html' with { variable: b | unique } }}
  * 	|	{% else %}
  * 	|		{{ import 'c.html' }}
  * 	|	{% endif %}
  * 	|
  * 	|	{% for i in rows %}
  * 	|		{% for j in columns %}
- * 	|			<div>{{ i }} {{ j }}</div>
+ * 	|			<div>{{ i | is_even ? "even" : "odd" }}</div>
  * 	|		{% endfor %}
  * 	|	{% endfor %}
  *
  * 	INB4
- * 	|	will have
- * 	|		[ ] import with scoped props {{ import 'file.html' with { new_variable: other.variable } }}
  * 	|	could have
- * 	|		[ ] function syntax for filters
+ * 	|		[ ] special variables inside loops like $loop.first and $loop.last
+ * 	|		[ ] function() syntax for filters
  * 	|		[ ] proper mark/node types zzZzZzZzz...
  * 	|		[ ] binary expressions and groups: == != >, >=, <, <= ( )
  * 	|	won't have
@@ -224,7 +226,7 @@ export function scan(input: string): Mark[] {
  * 	|	6	block_if              		{% if variable_1 and/or/not variable_2 %}
  * 	|	7	block_for             		{% for num, index in numbers | unique %}
  * 	|	8	block_comment         		{# multi-line comment #}
- * 	|	9	tag_import            		{{ import 'path/to/file.html' }}
+ * 	|	9	tag_import            		{{ import 'path/to/file.html' with { name: value } }}
  *
  **/
 
@@ -265,7 +267,7 @@ export function parse(marks: Mark[]): Node[] {
 	const RE_METHOD_INVALID = /[\- ]/;
 	const RE_KEYWORD_IF = /^if /;
 	const RE_KEYWORD_FOR = /^for | in /;
-	const RE_KEYWORD_IMPORT = /^import /;
+	const RE_KEYWORD_IMPORT = /^import | with /;
 	const RE_OPERATOR_NOT = /^not /;
 	const RE_OPERATOR_AND = / and /;
 	const RE_OPERATOR_OR = / or /;
@@ -481,20 +483,35 @@ export function parse(marks: Mark[]): Node[] {
 	}
 
 	function parse_tag_import(mark: Mark): Node {
-		const filepath = mark.value.split(RE_KEYWORD_IMPORT).pop() as string;
-		const filepath_unquoted: string = filepath.slice(1, -1);
-
-		if (!filepath_unquoted) {
-			throw new NanoError('Invalid import path');
-		}
+		const [ filepath, variables ] = mark.value.split(RE_KEYWORD_IMPORT).filter(v => v).map(v => v.trim());
+		const trimmed_filepath = filepath.slice(1, -1);
 
 		if (!RE_VARIABLE_IN_QUOTES.test(filepath)) {
 			throw new NanoError('Import path must be in quotes');
 		}
 
+		if (!trimmed_filepath) {
+			throw new NanoError('Invalid import path');
+		}
+
 		return new Node(NODE_TYPES[9], {
-			path: filepath_unquoted,
+			path: trimmed_filepath,
+			variables: variables ? return_object_map(variables) : null
 		});
+
+		function return_object_map(variables: string): Node {
+			try {
+				const list = variables.slice(1, -1).trim();
+				const pairs = list.split(',').map(v => v.trim());
+
+				return pairs.reduce((map, pair) => {
+					const [ key, value ] = pair.split(':').map(v => v.trim());
+					return { ...map, [key]: parse_expression(value) }
+				}, {});
+			} catch {
+				throw new NanoError('Invalid import variable object');
+			}
+		}
 	}
 
 	function parse_tag_mark(mark: Mark): Node {
@@ -704,8 +721,19 @@ export async function compile(nodes: Node[], input_data: InputData = {}, input_m
 		const default_path = default_options.import_path;
 		const import_path_dir = import_path ? import_path.endsWith('/') ? import_path : import_path + '/' : default_path;
 		const import_file = await Deno.readTextFile(import_path_dir + node.path);
+		const import_data = node.variables ? await compile_scoped_variables(node.variables) : input_data;
 
-		return compile(parse(scan(import_file)), input_data, input_methods, compile_options);
+		async function compile_scoped_variables(variables: Record<string, Node>) {
+			const scoped_variables: Record<string, any> = {};
+
+			for (const key of Object.keys(variables)) {
+				scoped_variables[key] = await compile_node(variables[key])
+			}
+
+			return scoped_variables;
+		}
+
+		return compile(parse(scan(import_file)), import_data, input_methods, compile_options);
 	}
 
 	async function compile_node(node: Node): Promise<any> {
