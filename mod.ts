@@ -2,7 +2,7 @@
 
 /**
  *
- * 	v0.0.11
+ * 	v0.0.12
  *
  * 	Nano is a very simple (almost) logic-less template engine. This was initially
  * 	made for playing around with simple prototypes deployed with Deno Deploy,
@@ -112,8 +112,8 @@ export function scan(input: string): Mark[] {
 	const RE_BLOCK = /^{%.*?%}$/;
 	const RE_TAG = /^{{.*?}}$/;
 	const RE_COMMENT = /^{#[^]*?#}$/;
-	const RE_PRE = /^<pre>[^]*?<\/pre>$/;
-	const RE_ALL = /({%.*?%}|{{.*?}}|{#[^]*?#}|(<pre>)[^]*?(<\/pre>))/;
+	const RE_ALL = /({%.*?%}|{{.*?}}|{#[^]*?#})/;
+	const RE_BREAK = /[\n\r\t]/g;
 	const RE_STACK_BLOCK_TAG = /^\bif\b|^\bfor\b/;
 	const RE_VALID_BLOCK_TAG = /^\bif\b|^\bfor\b|^\belseif\b|^\belse\b/;
 
@@ -127,9 +127,7 @@ export function scan(input: string): Mark[] {
 		let mark_value = tokens[i];
 
 		if (mark_type === MARK_TYPES[3]) {
-			if (!RE_PRE.test(mark_value)) {
-				mark_value = mark_value.replace(/[\n\r\t]/g, '')
-			}
+			mark_value = mark_value.replace(RE_BREAK, '')
 		} else {
 			mark_value = mark_value.slice(2, -2).trim();
 		}
