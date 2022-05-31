@@ -2,7 +2,7 @@
 
 /**
  *
- * 	v0.0.12
+ * 	v0.0.13
  *
  * 	Nano is a very simple (almost) logic-less template engine. This was initially
  * 	made for playing around with simple prototypes deployed with Deno Deploy,
@@ -113,6 +113,7 @@ export function scan(input: string): Mark[] {
 	const RE_TAG = /^{{.*?}}$/;
 	const RE_COMMENT = /^{#[^]*?#}$/;
 	const RE_ALL = /({%.*?%}|{{.*?}}|{#[^]*?#})/;
+	const RE_PRE = /<pre>[^]*?<\/pre>/g;
 	const RE_BREAK = /[\n\r\t]/g;
 	const RE_STACK_BLOCK_TAG = /^\bif\b|^\bfor\b/;
 	const RE_VALID_BLOCK_TAG = /^\bif\b|^\bfor\b|^\belseif\b|^\belse\b/;
@@ -120,15 +121,13 @@ export function scan(input: string): Mark[] {
 	const marks: Mark[] = [];
 	const mark_stack: Mark[] = [];
 	const operation_stack: string[] = [];
-	const tokens: Token[] = input.split(RE_ALL).filter(v => v);
+	const tokens: Token[] = trim_input(input).split(RE_ALL).filter(v => v);
 
 	for (let i = 0; i < tokens.length; i += 1) {
 		const mark_type = return_mark_type(tokens[i]);
 		let mark_value = tokens[i];
 
-		if (mark_type === MARK_TYPES[3]) {
-			mark_value = mark_value.replace(RE_BREAK, '')
-		} else {
+		if (mark_type !== MARK_TYPES[3]) {
 			mark_value = mark_value.slice(2, -2).trim();
 		}
 
@@ -156,11 +155,11 @@ export function scan(input: string): Mark[] {
 				traverse_mark_stack(last_in_stack, mark_type);
 			} else {
 				if (!RE_VALID_BLOCK_TAG.test(mark_value)) {
-					throw new NanoError(`Invalid {% ${mark_value} %} statement`)
+					throw new NanoError(`Invalid {% ${mark_value} %} statement`);
 				}
 
 				if (RE_STACK_BLOCK_TAG.test(mark_value)) {
-					operation_stack.push(mark_value)
+					operation_stack.push(mark_value);
 				}
 
 				mark_stack.push(new Mark(mark_type, mark_value));
@@ -172,6 +171,23 @@ export function scan(input: string): Mark[] {
 
 	if (mark_stack.length > 0) {
 		throw new NanoError(`Missing end tag inside {% ${mark_stack[0].value} %} block`);
+	}
+
+	function trim_input(raw_input: string) {
+		const input_pre = raw_input.match(RE_PRE);
+		const input_trim = raw_input.replace(RE_BREAK, '');
+
+		raw_input = input_trim;
+
+		if (input_pre) {
+			const input_trim_pre = input_trim.match(RE_PRE);
+
+			for (let match = 0; match < input_pre.length; match += 1) {
+				raw_input = raw_input.replace(input_trim_pre[match], input_pre[match]);
+			}
+		}
+
+		return raw_input;
 	}
 
 	function traverse_mark_stack(last_in_stack: Mark, mark_type: string) {
@@ -309,7 +325,7 @@ export function parse(marks: Mark[]): Node[] {
 
 		if (RE_VARIABLE_BOOLEAN.test(value_string)) {
 			return new Node(NODE_TYPES[0], {
-				value: value_string === 'true' ? true : false
+				value: value_string === 'true' ? true : false,
 			});
 		}
 
@@ -540,7 +556,7 @@ export function parse(marks: Mark[]): Node[] {
 
 		return new Node(NODE_TYPES[10], {
 			path: trimmed_filepath,
-			variables: variables ? return_object_map(variables) : null
+			variables: variables ? return_object_map(variables) : null,
 		});
 
 		function return_object_map(variables: string): Node {
@@ -549,15 +565,14 @@ export function parse(marks: Mark[]): Node[] {
 				const pairs = list.split(',').map(v => v.trim());
 
 				return pairs.reduce((map, pair) => {
-					const [ key, value ] = pair.split(':').map(v => v.trim());
-					return { ...map, [key]: parse_expression(value) }
+					const [key, value] = pair.split(':').map(v => v.trim());
+					return { ...map, [key]: parse_expression(value) };
 				}, {});
 			} catch {
 				throw new NanoError('Invalid import variable object');
 			}
 		}
 	}
-
 
 	function render_block_mark(mark: Mark): Node {
 		if (mark.value.startsWith('if ')) {
@@ -784,7 +799,7 @@ export async function compile(nodes: Node[], input_data: InputData = {}, input_m
 			const scoped_variables: Record<string, any> = {};
 
 			for (const key of Object.keys(variables)) {
-				scoped_variables[key] = await compile_node(variables[key])
+				scoped_variables[key] = await compile_node(variables[key]);
 			}
 
 			return scoped_variables;
@@ -819,7 +834,7 @@ export async function compile(nodes: Node[], input_data: InputData = {}, input_m
 		}
 
 		if (node.type === NODE_TYPES[6]) {
-			return compile_expression_binary(node)
+			return compile_expression_binary(node);
 		}
 
 		if (node.type === NODE_TYPES[7]) {
