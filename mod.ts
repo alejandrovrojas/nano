@@ -2,7 +2,7 @@
 
 /**
  *
- * 	v0.0.14
+ * 	v0.0.15
  *
  * 	Nano is a simple (almost) logic-less template engine. This was initially made
  * 	for playing around with simple prototypes deployed with Deno Deploy, which
@@ -182,8 +182,10 @@ export function scan(input: string): Mark[] {
 		if (input_pre) {
 			const input_trim_pre = input_trim.match(RE_PRE);
 
-			for (let match = 0; match < input_pre.length; match += 1) {
-				raw_input = raw_input.replace(input_trim_pre[match], input_pre[match]);
+			if (input_trim_pre) {
+				for (let match = 0; match < input_pre.length; match += 1) {
+					raw_input = raw_input.replace(input_trim_pre[match], input_pre[match]);
+				}
 			}
 		}
 
@@ -246,10 +248,11 @@ export function scan(input: string): Mark[] {
  * 	|	3	expression_conditional		variable ? 'value_if_true' : 'value_if_false'
  * 	|	4	expression_logical    		A or B and C
  * 	|	5	expression_unary      		not A
- * 	|	6	block_if              		{% if variable_1 and/or/not variable_2 %}
- * 	|	7	block_for             		{% for num, index in numbers | unique %}
- * 	|	8	block_comment         		{# multi-line comment #}
- * 	|	9	tag_import            		{{ import 'path/to/file.html' with { name: value } }}
+ * 	|	6	expression_binary     		is A
+ * 	|	7	block_if              		{% if variable_1 and/or/not variable_2 %}
+ * 	|	8	block_for             		{% for num, index in numbers | unique %}
+ * 	|	9	block_comment         		{# multi-line comment #}
+ * 	|	10	tag_import            		{{ import 'path/to/file.html' with { name: value } }}
  *
  **/
 
@@ -413,25 +416,27 @@ export function parse(marks: Mark[]): Node[] {
 
 		const split_or = expression_string.split(RE_OPERATOR_OR);
 
-		if (split_or.length === 2) {
-			const [left, right] = split_or;
+		if (split_or.length >= 2) {
+			const split_operator = RE_OPERATOR_OR.toString().slice(1, -1);
+			const [left, ...right] = split_or;
 
 			return new Node(NODE_TYPES[4], {
 				operator: 'or',
 				left: parse_expression_logical(left),
-				right: parse_expression_logical(right),
+				right: parse_expression_logical(right.join(split_operator)),
 			});
 		}
 
 		const split_and = expression_string.split(RE_OPERATOR_AND);
 
-		if (split_and.length === 2) {
-			const [left, right] = split_and;
+		if (split_and.length >= 2) {
+			const split_operator = RE_OPERATOR_AND.toString().slice(1, -1);
+			const [left, ...right] = split_and;
 
 			return new Node(NODE_TYPES[4], {
 				operator: 'and',
 				left: parse_expression_logical(left),
-				right: parse_expression_logical(right),
+				right: parse_expression_logical(right.join(split_operator)),
 			});
 		}
 
@@ -472,12 +477,12 @@ export function parse(marks: Mark[]): Node[] {
 			return parse_expression_conditional(expression_string);
 		}
 
-		if (RE_OPERATOR_BINARY.test(expression_string)) {
-			return parse_expression_binary(expression_string);
-		}
-
 		if (RE_OPERATOR_LOGICAL.test(expression_string)) {
 			return parse_expression_logical(expression_string);
+		}
+
+		if (RE_OPERATOR_BINARY.test(expression_string)) {
+			return parse_expression_binary(expression_string);
 		}
 
 		if (RE_OPERATOR_FILTER.test(expression_string)) {
@@ -633,11 +638,11 @@ export function parse(marks: Mark[]): Node[] {
  *
  * */
 
-type InputData = {
+type NanoInputData = {
 	[key: string]: any;
 };
 
-type InputMethods = {
+type NanoInputMethods = {
 	[key: string]: (...args: any[]) => any;
 };
 
@@ -646,7 +651,7 @@ type NanoOptions = {
 	import_path?: string;
 };
 
-export async function compile(nodes: Node[], input_data: InputData = {}, input_methods: InputMethods = {}, input_options?: NanoOptions): Promise<string> {
+export async function compile(nodes: Node[], input_data: NanoInputData = {}, input_methods: NanoInputMethods = {}, input_options?: NanoOptions): Promise<string> {
 	const default_options: NanoOptions = { show_comments: false, import_path: '' };
 	const compile_options: NanoOptions = { ...default_options, ...input_options };
 
@@ -861,6 +866,6 @@ export async function compile(nodes: Node[], input_data: InputData = {}, input_m
 	return output.join('');
 }
 
-export async function render(input: string, input_data: InputData, input_methods?: InputMethods, input_options?: NanoOptions) {
+export async function render(input: string, input_data: NanoInputData = {}, input_methods: NanoInputMethods = {}, input_options?: NanoOptions) {
 	return compile(parse(scan(input)), input_data, input_methods, input_options);
 }
