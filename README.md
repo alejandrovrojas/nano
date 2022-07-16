@@ -126,5 +126,5 @@ However it's possible to pass variables as props which allows for greater reusab
 
 #### Comments
 ```twig
-{# comments can be single-line #}
+{# comments look like this #}
 ```
