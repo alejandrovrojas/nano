@@ -2,66 +2,34 @@
 
 /**
  *
- * 	v0.0.15
+ * 	v0.1.0
  *
- * 	Nano is a simple (almost) logic-less template engine. This was initially made
- * 	for playing around with simple prototypes deployed with Deno Deploy, which
- * 	currently doesn't support template engines that rely on eval() for evaluating
- * 	expressions at runtime. Nano currently supports logical and binary expressions
- * 	but only using variables passed during the rendering phase or primitive values
- * 	i.e. strings, numbers and booleans. Nano does still support all the basics like
- * 	if/elseif/else/for statements, nested loops, filters, and imports with props.
- * 	Nano inherits most of its syntax from the most commonly known template engines
- * 	like Django, Twig, etc. See examples below.
+ * 	Nano is a template engine initially made for use with Deno Deploy, which currently
+ * 	doesn't support template engines that rely on eval() for evaluating expressions
+ * 	at runtime. Nano currently supports logical and binary expressions but only using
+ * 	variables passed during the rendering phase and/or primitive values i.e. strings,
+ * 	numbers and booleans. Nano does still support all the basics like if/else/for
+ * 	statements, nested loops, filters, and imports with props. Nano inherits most of
+ * 	its syntax from the most commonly known template engines like Django, Twig, etc.
  *
  * 	USAGE
  * 	|	const template  =  <div>Hello {{ name | shout }}</div>
  * 	|	const data      =  { name: "Alejandro" }
  * 	|	const filters   =  { shout: value => value + '!' }
- * 	|	const options   =  {}
  * 	|
- * 	|	>  await render(template, data, filters, options)
+ * 	|	>  await render(template, data, filters)
  * 	|	>  <div>Hello Alejandro!</div>
  *
- * 	OPTIONS
- * 	|	show_comments (default: false)	| whether to include {# comments #}
- * 	|	                              	| in the rendered output
- * 	|
- * 	|	import_path   (default: '')   	| path to prepend to filepath
- * 	|	                              	| in {% import 'filepath' %}
- *
- * 	EXAMPLES
- * 	|	{% for item, index in array_like | unique %}
- * 	|		{{ item.a | lowercase }}
- * 	|	{% endfor %}
- * 	|
- * 	|	{% for key, value in object_like | filtered | sorted %}
- * 	|		{{ value['nested']['property'] | uppercase }}
- * 	|	{% endfor %}
- * 	|
- * 	|	{# comments #}
- * 	|
- * 	|	{% if some_variable %}
- * 	|		{{ import 'a.html' with { scoped: some_variable | uppercase } }}
- * 	|	{% elseif some.string is "foo" or some.number is not 100 %}
- * 	|		{{ import 'b.html' }}
- * 	|	{% else %}
- * 	|		{{ import 'c.html' }}
- * 	|	{% endif %}
- * 	|
- * 	|	{% for i in rows %}
- * 	|		{% for j in columns %}
- * 	|			<div>{{ i | is_even ? "even" : "odd" }}</div>
- * 	|		{% endfor %}
- * 	|	{% endfor %}
- *
  * 	INB4
+ * 	|	should have
+ * 	|		[ ] reserve null and undefined keywords for misc expressions
+ * 	|		[ ] keep track of indentation and line numbers for debugging/error messages
  * 	|	could have
- * 	|		[ ] special variables inside loops like $loop.first and $loop.last
+ * 	|		[ ] expression groups ( )
  * 	|		[ ] proper mark/node types zzZzZzZzz...
- * 	|		[ ] additional expressions and groups: >, >=, <, <= ( )
  * 	|	won't have
- * 	|		[x] inline object-like variable definitions and/or expressions -> {{ [1, 2, 2, 3] | unique }}
+ * 	|		[x] arithmetic operators + - / *
+ * 	|		[x] inline object-like variable definitions -> {{ [1, 2, 2, 3] | unique }}
  *
  */
 
@@ -83,8 +51,10 @@
  *
  **/
 
+import { join as join_path } from "https://deno.land/std@0.148.0/path/mod.ts";
+
 class NanoError extends Error {
-	public name = 'NanoSyntaxError';
+	public name = 'NanoError';
 }
 
 class Mark {
@@ -113,8 +83,8 @@ export function scan(input: string): Mark[] {
 	const RE_TAG = /^{{.*?}}$/;
 	const RE_COMMENT = /^{#[^]*?#}$/;
 	const RE_ALL = /({%.*?%}|{{.*?}}|{#[^]*?#})/;
-	const RE_PRE = /<pre>[^]*?<\/pre>/g;
 	const RE_BREAK = /[\n\r\t]/g;
+	const RE_BREAK_IGNORE = /(<pre>|<!--|{#)[^]*?(<\/pre>|-->|#})/g;
 	const RE_STACK_BLOCK_TAG = /^\bif\b|^\bfor\b/;
 	const RE_VALID_BLOCK_TAG = /^\bif\b|^\bfor\b|^\belseif\b|^\belse\b/;
 
@@ -174,13 +144,13 @@ export function scan(input: string): Mark[] {
 	}
 
 	function trim_input(raw_input: string) {
-		const input_pre = raw_input.match(RE_PRE);
+		const input_pre = raw_input.match(RE_BREAK_IGNORE);
 		const input_trim = raw_input.replace(RE_BREAK, '');
 
 		raw_input = input_trim;
 
 		if (input_pre) {
-			const input_trim_pre = input_trim.match(RE_PRE);
+			const input_trim_pre = input_trim.match(RE_BREAK_IGNORE);
 
 			if (input_trim_pre) {
 				for (let match = 0; match < input_pre.length; match += 1) {
@@ -242,16 +212,16 @@ export function scan(input: string): Mark[] {
  * 	care of syntax formatting and should provide all relevant properties
  * 	to the renderer.
  *
- * 	|	0	value_text            		<div>text</div>
+ * 	|	0	value_primitive       		"text" | 100 | true | false
  * 	|	1	value_variable        		variable.dot.separated / variable['named-key']
- * 	|	2	expression_filter     		variable | filter | names
- * 	|	3	expression_conditional		variable ? 'value_if_true' : 'value_if_false'
- * 	|	4	expression_logical    		A or B and C
- * 	|	5	expression_unary      		not A
- * 	|	6	expression_binary     		is A
- * 	|	7	block_if              		{% if variable_1 and/or/not variable_2 %}
- * 	|	8	block_for             		{% for num, index in numbers | unique %}
- * 	|	9	block_comment         		{# multi-line comment #}
+ * 	|	2	expression_filter     		variable | filter_1 | filter_2
+ * 	|	3	expression_ternary    		variable ? 'value_if_true' : 'value_if_false'
+ * 	|	4	expression_logical    		A && B || C
+ * 	|	5	expression_unary      		!A
+ * 	|	6	expression_binary     		== != > < >= <=
+ * 	|	7	block_if              		{% if condition_1 %} {% elseif condition_2 %} {% endif %}
+ * 	|	8	block_for             		{% for num, index in numbers | unique %} {% endfor %}
+ * 	|	9	tag_comment           		{# multi-line comment #}
  * 	|	10	tag_import            		{{ import 'path/to/file.html' with { name: value } }}
  *
  **/
@@ -269,38 +239,39 @@ class Node {
 }
 
 const NODE_TYPES = [
-	'value_text',
+	'value_primitive',
 	'value_variable',
 	'expression_filter',
-	'expression_conditional',
+	'expression_ternary',
 	'expression_logical',
 	'expression_unary',
 	'expression_binary',
 	'block_if',
 	'block_for',
-	'block_comment',
+	'tag_comment',
 	'tag_import',
 ];
 
 export function parse(marks: Mark[]): Node[] {
 	const RE_ACCESS_DOT = /\./;
 	const RE_ACCESS_BRACKET = /\[["']|['"]\]/;
-	const RE_VARIABLE_EXPRESSION_LIKE = /[\&\|\<\>\+\-\=\!\{\}\,]/;
+	const RE_EXPRESSION_ARITHMETIC_LIKE = /[\+\-\*\/\%]/;
+	const RE_VARIABLE_OBJECT_LIKE = /[\{\}\[\]]/;
 	const RE_VARIABLE_EMPTY = /^['"]['"]$/;
 	const RE_VARIABLE_IN_QUOTES = /^['"].+?['"]$/;
 	const RE_VARIABLE_BRACKET_NOTATION = /\[['"]/;
 	const RE_VARIABLE_DIGIT = /^-?(\d|\.\d)+$/;
 	const RE_VARIABLE_BOOLEAN = /^(true|false)$/;
 	const RE_VARIABLE_VALID = /^[0-9a-zA-Z_$]*$/;
-	const RE_METHOD_INVALID = /[\- ]/;
 	const RE_KEYWORD_IF = /^if /;
 	const RE_KEYWORD_FOR = /^for | in /;
 	const RE_KEYWORD_IMPORT = /^import | with /;
-	const RE_OPERATOR_NOT = /^not /;
-	const RE_OPERATOR_AND = / and /;
-	const RE_OPERATOR_OR = / or /;
-	const RE_OPERATOR_BINARY = / is /;
-	const RE_OPERATOR_LOGICAL = /not |( and | or )/;
+	const RE_OPERATOR_NOT = /(\!(?!\=))/;
+	const RE_OPERATOR_AND = /( \&\& )/;
+	const RE_OPERATOR_OR = /( \|\| )/;
+	const RE_OPERATOR_LOGICAL = /( ?\!(?!\=)| \&\& | \|\| )/g;
+	const RE_OPERATOR_BINARY = / ?(==|!=|>=|<=|>|<) ?/g;
+	const RE_OPERATOR_UNARY = / ?(!)/g;
 	const RE_OPERATOR_FILTER = / ?\| ?/;
 	const RE_OPERATOR_TERNARY = /[?:]/;
 	const RE_OPERATOR_INDEX = /\, ?/;
@@ -356,9 +327,9 @@ export function parse(marks: Mark[]): Node[] {
 			});
 		}
 
-		const variable_parts = value_string.split(RE_ACCESS_DOT);
+		const variable_parts = value_string.split(RE_ACCESS_DOT).map(v => v.trim());
 
-		for (const part of variable_parts) {
+		for (let part of variable_parts) {
 			if (!RE_VARIABLE_EMPTY.test(part) && !RE_VARIABLE_VALID.test(part)) {
 				throw new NanoError(`Invalid variable name: "${value_string}"`);
 			}
@@ -390,7 +361,7 @@ export function parse(marks: Mark[]): Node[] {
 		});
 	}
 
-	function parse_expression_conditional(expression_string: string): Node {
+	function parse_expression_ternary(expression_string: string): Node {
 		const statement_parts = expression_string.split(RE_OPERATOR_TERNARY).map(v => v.trim());
 
 		if (statement_parts.length < 3) {
@@ -416,38 +387,36 @@ export function parse(marks: Mark[]): Node[] {
 
 		const split_or = expression_string.split(RE_OPERATOR_OR);
 
-		if (split_or.length >= 2) {
-			const split_operator = RE_OPERATOR_OR.toString().slice(1, -1);
-			const [left, ...right] = split_or;
+		if (split_or.length >= 3) {
+			const [left, operator, ...right] = split_or;
 
 			return new Node(NODE_TYPES[4], {
-				operator: 'or',
+				operator: '||',
 				left: parse_expression_logical(left),
-				right: parse_expression_logical(right.join(split_operator)),
+				right: parse_expression_logical(right.join('')),
 			});
 		}
 
 		const split_and = expression_string.split(RE_OPERATOR_AND);
 
-		if (split_and.length >= 2) {
-			const split_operator = RE_OPERATOR_AND.toString().slice(1, -1);
-			const [left, ...right] = split_and;
+		if (split_and.length >= 3) {
+			const [left, operator, ...right] = split_and;
 
 			return new Node(NODE_TYPES[4], {
-				operator: 'and',
+				operator: '&&',
 				left: parse_expression_logical(left),
-				right: parse_expression_logical(right.join(split_operator)),
+				right: parse_expression_logical(right.join('')),
 			});
 		}
 
 		const split_not = expression_string.split(RE_OPERATOR_NOT);
 
-		if (split_not.length === 2) {
-			const [operator, value] = split_not;
+		if (split_not.length === 3) {
+			const [_, operator, variable] = split_not;
 
 			return new Node(NODE_TYPES[5], {
-				operator: 'not',
-				value: parse_expression_logical(value),
+				operator: '!',
+				value: parse_expression_logical(variable),
 			});
 		}
 
@@ -455,12 +424,12 @@ export function parse(marks: Mark[]): Node[] {
 	}
 
 	function parse_expression_binary(expression_string: string): Node {
-		const statement_parts = expression_string.split(RE_OPERATOR_BINARY).map(v => v.trim());
-		const [variable, value] = statement_parts;
+		const [left, operator, right] = expression_string.split(RE_OPERATOR_BINARY);
 
 		return new Node(NODE_TYPES[6], {
-			variable: parse_expression(variable),
-			value: parse_expression(value),
+			operator: operator,
+			left: parse_expression(left),
+			right: parse_expression(right),
 		});
 	}
 
@@ -474,7 +443,7 @@ export function parse(marks: Mark[]): Node[] {
 
 	function parse_expression(expression_string: string): Node {
 		if (RE_OPERATOR_TERNARY.test(expression_string)) {
-			return parse_expression_conditional(expression_string);
+			return parse_expression_ternary(expression_string);
 		}
 
 		if (RE_OPERATOR_LOGICAL.test(expression_string)) {
@@ -541,14 +510,14 @@ export function parse(marks: Mark[]): Node[] {
 		});
 	}
 
-	function parse_block_comment(mark: Mark): Node {
+	function parse_tag_comment(mark: Mark): Node {
 		return new Node(NODE_TYPES[9], {
 			value: mark.value,
 		});
 	}
 
 	function parse_tag_import(mark: Mark): Node {
-		const [ filepath, variables ] = mark.value.split(RE_KEYWORD_IMPORT).filter(v => v).map(v => v.trim());
+		const [filepath, variables] = mark.value.split(RE_KEYWORD_IMPORT).filter(v => v).map(v => v.trim());
 		const trimmed_filepath = filepath.slice(1, -1);
 
 		if (!RE_VARIABLE_IN_QUOTES.test(filepath)) {
@@ -600,7 +569,7 @@ export function parse(marks: Mark[]): Node[] {
 	}
 
 	function render_comment_mark(mark: Mark): Node {
-		return parse_block_comment(mark);
+		return parse_tag_comment(mark);
 	}
 
 	function render_text_mark(mark: Mark): Node {
@@ -647,12 +616,12 @@ type NanoInputMethods = {
 };
 
 type NanoOptions = {
-	show_comments?: boolean;
+	display_comments?: boolean;
 	import_path?: string;
 };
 
 export async function compile(nodes: Node[], input_data: NanoInputData = {}, input_methods: NanoInputMethods = {}, input_options?: NanoOptions): Promise<string> {
-	const default_options: NanoOptions = { show_comments: false, import_path: '' };
+	const default_options: NanoOptions = { display_comments: false, import_path: '' };
 	const compile_options: NanoOptions = { ...default_options, ...input_options };
 
 	const output: string[] = [];
@@ -699,32 +668,31 @@ export async function compile(nodes: Node[], input_data: NanoInputData = {}, inp
 		const left = await compile_node(node.left);
 		const right = await compile_node(node.right);
 
-		if (node.operator === 'and') {
-			return left && right;
-		}
-
-		if (node.operator === 'or') {
-			return left || right;
+		switch (node.operator) {
+			case "&&": return left && right;
+			case "||": return left || right;
 		}
 	}
 
-	async function compile_expression_binary(node: Node): Promise<boolean> {
-		const variable = await compile_node(node.variable);
-		const value = await compile_node(node.value);
+	async function compile_expression_binary(node: Node): Promise<boolean | undefined> {
+		const left = await compile_node(node.left);
+		const right = await compile_node(node.right);
 
-		if (node.value.operator && node.value.operator === 'not') {
-			const node_value = await compile_node(node.value.value);
-			return variable !== node_value;
-		} else {
-			return variable === value;
+		switch(node.operator) {
+			case '==': return left === right;
+			case '!=': return left !== right;
+			case '>': return left > right;
+			case '<': return left < right;
+			case '>=': return left >= right;
+			case '<=': return left <= right;
 		}
 	}
 
 	async function compile_expression_unary(node: Node): Promise<boolean | undefined> {
 		const value = await compile_node(node.value);
 
-		if (node.operator === 'not') {
-			return !value;
+		switch(node.operator) {
+			case '!': return !value;
 		}
 	}
 
@@ -789,28 +757,32 @@ export async function compile(nodes: Node[], input_data: NanoInputData = {}, inp
 		return block_output.join('');
 	}
 
-	async function compile_block_comment(node: Node): Promise<string> {
-		return compile_options.show_comments ? `<!-- ${node.value} -->` : '';
+	async function compile_tag_comment(node: Node): Promise<string> {
+		return compile_options.display_comments ? `<!-- ${node.value} -->` : '';
 	}
 
 	async function compile_tag_import(node: Node): Promise<string> {
-		const import_path = compile_options.import_path;
-		const default_path = default_options.import_path;
-		const import_path_dir = import_path ? import_path.endsWith('/') ? import_path : import_path + '/' : default_path;
-		const import_file = await Deno.readTextFile(import_path_dir + node.path);
-		const import_data = node.variables ? await compile_scoped_variables(node.variables) : input_data;
+		const import_path_dir = compile_options.import_path || default_options.import_path || "";
+		const import_file_path = join_path(import_path_dir, node.path);
 
-		async function compile_scoped_variables(variables: Record<string, Node>) {
-			const scoped_variables: Record<string, any> = {};
+		try {
+			const import_file = await Deno.readTextFile(import_file_path);
+			const import_data = node.variables ? await compile_scoped_variables(node.variables) : input_data;
 
-			for (const key of Object.keys(variables)) {
-				scoped_variables[key] = await compile_node(variables[key]);
+			async function compile_scoped_variables(variables: Record<string, Node>) {
+				const scoped_variables: Record<string, any> = {};
+
+				for (const key of Object.keys(variables)) {
+					scoped_variables[key] = await compile_node(variables[key]);
+				}
+
+				return scoped_variables;
 			}
 
-			return scoped_variables;
+			return compile(parse(scan(import_file)), import_data, input_methods, compile_options);
+		} catch(error) {
+			throw new NanoError(`Imported file does not exist: ${import_file_path}`);
 		}
-
-		return compile(parse(scan(import_file)), import_data, input_methods, compile_options);
 	}
 
 	async function compile_node(node: Node): Promise<any> {
@@ -851,7 +823,7 @@ export async function compile(nodes: Node[], input_data: NanoInputData = {}, inp
 		}
 
 		if (node.type === NODE_TYPES[9]) {
-			return compile_block_comment(node);
+			return compile_tag_comment(node);
 		}
 
 		if (node.type === NODE_TYPES[10]) {
