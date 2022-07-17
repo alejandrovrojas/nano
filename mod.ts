@@ -2,7 +2,7 @@
 
 /**
  *
- * 	v0.1.0
+ * 	v0.1.1
  *
  * 	Nano is a template engine initially made for use with Deno Deploy, which currently
  * 	doesn't support template engines that rely on eval() for evaluating expressions
@@ -22,7 +22,6 @@
  *
  * 	INB4
  * 	|	should have
- * 	|		[ ] reserve null and undefined keywords for misc expressions
  * 	|		[ ] keep track of indentation and line numbers for debugging/error messages
  * 	|	could have
  * 	|		[ ] expression groups ( )
@@ -212,16 +211,16 @@ export function scan(input: string): Mark[] {
  * 	care of syntax formatting and should provide all relevant properties
  * 	to the renderer.
  *
- * 	|	0	value_primitive       		"text" | 100 | true | false
- * 	|	1	value_variable        		variable.dot.separated / variable['named-key']
- * 	|	2	expression_filter     		variable | filter_1 | filter_2
- * 	|	3	expression_ternary    		variable ? 'value_if_true' : 'value_if_false'
- * 	|	4	expression_logical    		A && B || C
- * 	|	5	expression_unary      		!A
- * 	|	6	expression_binary     		== != > < >= <=
- * 	|	7	block_if              		{% if condition_1 %} {% elseif condition_2 %} {% endif %}
- * 	|	8	block_for             		{% for num, index in numbers | unique %} {% endfor %}
- * 	|	9	tag_comment           		{# multi-line comment #}
+ * 	|	0 	value_primitive       		"text" | 100 | true | false
+ * 	|	1 	value_variable        		variable.dot.separated / variable['named-key']
+ * 	|	2 	expression_filter     		variable | filter_1 | filter_2
+ * 	|	3 	expression_conditional		variable ? 'value_if_true' : 'value_if_false'
+ * 	|	4 	expression_logical    		A && B || C
+ * 	|	5 	expression_unary      		!A
+ * 	|	6 	expression_binary     		== != > < >= <=
+ * 	|	7 	block_if              		{% if condition_1 %} {% elseif condition_2 %} {% endif %}
+ * 	|	8 	block_for             		{% for num, index in numbers | unique %} {% endfor %}
+ * 	|	9 	tag_comment           		{# multi-line comment #}
  * 	|	10	tag_import            		{{ import 'path/to/file.html' with { name: value } }}
  *
  **/
@@ -242,7 +241,7 @@ const NODE_TYPES = [
 	'value_primitive',
 	'value_variable',
 	'expression_filter',
-	'expression_ternary',
+	'expression_conditional',
 	'expression_logical',
 	'expression_unary',
 	'expression_binary',
@@ -255,13 +254,14 @@ const NODE_TYPES = [
 export function parse(marks: Mark[]): Node[] {
 	const RE_ACCESS_DOT = /\./;
 	const RE_ACCESS_BRACKET = /\[["']|['"]\]/;
-	const RE_EXPRESSION_ARITHMETIC_LIKE = /[\+\-\*\/\%]/;
+	const RE_VARIABLE_ARITHMETIC_LIKE = /[\+\-\*\/\%]/;
 	const RE_VARIABLE_OBJECT_LIKE = /[\{\}\[\]]/;
 	const RE_VARIABLE_EMPTY = /^['"]['"]$/;
 	const RE_VARIABLE_IN_QUOTES = /^['"].+?['"]$/;
 	const RE_VARIABLE_BRACKET_NOTATION = /\[['"]/;
 	const RE_VARIABLE_DIGIT = /^-?(\d|\.\d)+$/;
 	const RE_VARIABLE_BOOLEAN = /^(true|false)$/;
+	const RE_VARIABLE_FALSY = /^(null|undefined)$/;
 	const RE_VARIABLE_VALID = /^[0-9a-zA-Z_$]*$/;
 	const RE_KEYWORD_IF = /^if /;
 	const RE_KEYWORD_FOR = /^for | in /;
@@ -269,11 +269,10 @@ export function parse(marks: Mark[]): Node[] {
 	const RE_OPERATOR_NOT = /(\!(?!\=))/;
 	const RE_OPERATOR_AND = /( \&\& )/;
 	const RE_OPERATOR_OR = /( \|\| )/;
+	const RE_OPERATOR_CONDITIONAL = / \? | \: /;
 	const RE_OPERATOR_LOGICAL = /( ?\!(?!\=)| \&\& | \|\| )/g;
 	const RE_OPERATOR_BINARY = / ?(==|!=|>=|<=|>|<) ?/g;
-	const RE_OPERATOR_UNARY = / ?(!)/g;
 	const RE_OPERATOR_FILTER = / ?\| ?/;
-	const RE_OPERATOR_TERNARY = /[?:]/;
 	const RE_OPERATOR_INDEX = /\, ?/;
 
 	const nodes = [];
@@ -288,6 +287,12 @@ export function parse(marks: Mark[]): Node[] {
 		if (RE_VARIABLE_IN_QUOTES.test(value_string)) {
 			return new Node(NODE_TYPES[0], {
 				value: value_string.slice(1, -1),
+			});
+		}
+
+		if (RE_VARIABLE_FALSY.test(value_string)) {
+			return new Node(NODE_TYPES[0], {
+				value: value_string === 'null' ? null : undefined,
 			});
 		}
 
@@ -327,9 +332,17 @@ export function parse(marks: Mark[]): Node[] {
 			});
 		}
 
+		if (RE_VARIABLE_ARITHMETIC_LIKE.test(value_string)) {
+			throw new NanoError(`Arithmetic operators are not supported: "${ value_string }"`);
+		}
+
+		if (RE_VARIABLE_OBJECT_LIKE.test(value_string)) {
+			throw new NanoError(`Inline object or array variables are not supported`);
+		}
+
 		const variable_parts = value_string.split(RE_ACCESS_DOT).map(v => v.trim());
 
-		for (let part of variable_parts) {
+		for (const part of variable_parts) {
 			if (!RE_VARIABLE_EMPTY.test(part) && !RE_VARIABLE_VALID.test(part)) {
 				throw new NanoError(`Invalid variable name: "${value_string}"`);
 			}
@@ -361,8 +374,8 @@ export function parse(marks: Mark[]): Node[] {
 		});
 	}
 
-	function parse_expression_ternary(expression_string: string): Node {
-		const statement_parts = expression_string.split(RE_OPERATOR_TERNARY).map(v => v.trim());
+	function parse_expression_conditional(expression_string: string): Node {
+		const statement_parts = expression_string.split(RE_OPERATOR_CONDITIONAL).map(v => v.trim());
 
 		if (statement_parts.length < 3) {
 			throw new NanoError('Invalid conditional expression');
@@ -442,8 +455,8 @@ export function parse(marks: Mark[]): Node[] {
 	}
 
 	function parse_expression(expression_string: string): Node {
-		if (RE_OPERATOR_TERNARY.test(expression_string)) {
-			return parse_expression_ternary(expression_string);
+		if (RE_OPERATOR_CONDITIONAL.test(expression_string)) {
+			return parse_expression_conditional(expression_string);
 		}
 
 		if (RE_OPERATOR_LOGICAL.test(expression_string)) {
@@ -617,11 +630,11 @@ type NanoInputMethods = {
 
 type NanoOptions = {
 	display_comments?: boolean;
-	import_path?: string;
+	import_directory?: string;
 };
 
 export async function compile(nodes: Node[], input_data: NanoInputData = {}, input_methods: NanoInputMethods = {}, input_options?: NanoOptions): Promise<string> {
-	const default_options: NanoOptions = { display_comments: false, import_path: '' };
+	const default_options: NanoOptions = { display_comments: false, import_directory: '' };
 	const compile_options: NanoOptions = { ...default_options, ...input_options };
 
 	const output: string[] = [];
@@ -762,7 +775,7 @@ export async function compile(nodes: Node[], input_data: NanoInputData = {}, inp
 	}
 
 	async function compile_tag_import(node: Node): Promise<string> {
-		const import_path_dir = compile_options.import_path || default_options.import_path || "";
+		const import_path_dir = compile_options.import_directory || default_options.import_directory || "";
 		const import_file_path = join_path(import_path_dir, node.path);
 
 		try {
