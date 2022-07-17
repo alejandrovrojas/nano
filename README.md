@@ -29,8 +29,8 @@ await render(template, data, filters, options);
 
 - `display_comments` _(default: false)_ 
   - whether to display `{# comments #}` in the rendered output
-- `import_path` _(default: '')_ 
-  - path to prepend to all paths used in `{% import %}` blocks
+- `import_directory` _(default: '')_ 
+  - base directory to prepend to all paths used in `{% import %}` blocks
 
 ### Syntax
 
