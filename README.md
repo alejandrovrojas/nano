@@ -15,6 +15,7 @@ const filters = {
 const result = await render(template, data, filters);
 ```
 
+_Result:_
 ```html
 <div>Hello Alejandro!</div>
 ```
@@ -34,7 +35,7 @@ await render(template, data, filters, options);
 ### Syntax
 
 #### Variable access
-Both dot and bracket notation is supported
+Both dot and bracket notation is supported. Undefined/null variables are output as empty strings.
 ```twig
 {{ value.nested.property }}
 ```
@@ -127,4 +128,36 @@ However it's possible to pass variables as props which allows for greater reusab
 #### Comments
 ```twig
 {# comments look like this #}
+```
+
+#### Escaped output
+Nano doesn't provide a built-in method for escaping HTML but this can easily be solved with a filter:
+
+```js
+const template = `<code>{{ raw_html | escape }}</code>`;
+const data = {
+	raw_html: "<script>/**/</script>"
+};
+const filters = {
+	escape: (html_input: string) => {
+		const character_map: Record<string, string> = {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;',
+			"'": '&#39;',
+			'`': '&#x60;',
+			'=': '&#x3D;',
+			'/': '&#x2F;',
+		};
+
+		return html_input.replace(/[&<>"'`=\/]/g, (match: string) => character_map[match]);
+	}
+}
+
+const result = await render(template, data, filters);
+```
+_Result:_
+```html
+<code>&lt;script&gt;&#x2F;*test*&#x2F;&lt;&#x2F;script&gt;</code>
 ```
