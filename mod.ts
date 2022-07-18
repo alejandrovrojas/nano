@@ -2,7 +2,7 @@
 
 /**
  *
- * 	v0.1.1
+ * 	v0.1.2
  *
  * 	Nano is a template engine initially made for use with Deno Deploy, which currently
  * 	doesn't support template engines that rely on eval() for evaluating expressions
@@ -50,7 +50,7 @@
  *
  **/
 
-import { join as join_path } from "https://deno.land/std@0.148.0/path/mod.ts";
+import { join as join_path } from 'https://deno.land/std@0.148.0/path/mod.ts';
 
 class NanoError extends Error {
 	public name = 'NanoError';
@@ -252,6 +252,7 @@ const NODE_TYPES = [
 ];
 
 export function parse(marks: Mark[]): Node[] {
+	const RE_QUOTES = /["']/;
 	const RE_ACCESS_DOT = /\./;
 	const RE_ACCESS_BRACKET = /\[["']|['"]\]/;
 	const RE_VARIABLE_ARITHMETIC_LIKE = /[\+\-\*\/\%]/;
@@ -269,7 +270,7 @@ export function parse(marks: Mark[]): Node[] {
 	const RE_OPERATOR_NOT = /(\!(?!\=))/;
 	const RE_OPERATOR_AND = /( \&\& )/;
 	const RE_OPERATOR_OR = /( \|\| )/;
-	const RE_OPERATOR_CONDITIONAL = / \? | \: /;
+	const RE_OPERATOR_CONDITIONAL = / \? [^]*? \: /;
 	const RE_OPERATOR_LOGICAL = /( ?\!(?!\=)| \&\& | \|\| )/g;
 	const RE_OPERATOR_BINARY = / ?(==|!=|>=|<=|>|<) ?/g;
 	const RE_OPERATOR_FILTER = / ?\| ?/;
@@ -286,13 +287,20 @@ export function parse(marks: Mark[]): Node[] {
 	function parse_value_variable(value_string: string): Node {
 		if (RE_VARIABLE_IN_QUOTES.test(value_string)) {
 			return new Node(NODE_TYPES[0], {
-				value: value_string.slice(1, -1),
+				value: value_string.slice(1, -1)
 			});
 		}
 
 		if (RE_VARIABLE_FALSY.test(value_string)) {
+			function return_falsy_value() {
+				switch (value_string) {
+					case 'null': return null;
+					case 'undefined': return undefined;
+				}
+			}
+
 			return new Node(NODE_TYPES[0], {
-				value: value_string === 'null' ? null : undefined,
+				value: return_falsy_value(),
 			});
 		}
 
@@ -333,7 +341,7 @@ export function parse(marks: Mark[]): Node[] {
 		}
 
 		if (RE_VARIABLE_ARITHMETIC_LIKE.test(value_string)) {
-			throw new NanoError(`Arithmetic operators are not supported: "${ value_string }"`);
+			throw new NanoError(`Arithmetic operators are not supported: "${value_string}"`);
 		}
 
 		if (RE_VARIABLE_OBJECT_LIKE.test(value_string)) {
@@ -375,13 +383,30 @@ export function parse(marks: Mark[]): Node[] {
 	}
 
 	function parse_expression_conditional(expression_string: string): Node {
-		const statement_parts = expression_string.split(RE_OPERATOR_CONDITIONAL).map(v => v.trim());
+		function return_conditional_statement_parts() {
+			const statement_parts = [""];
+			let is_string_in_quotes = false;
 
-		if (statement_parts.length < 3) {
-			throw new NanoError('Invalid conditional expression');
+			for (const character of expression_string) {
+				if (RE_QUOTES.test(character)) {
+					is_string_in_quotes = !is_string_in_quotes;
+				}
+
+				if (!is_string_in_quotes && (character === '?' || character === ':')) {
+					statement_parts.push('');
+				} else {
+					statement_parts[statement_parts.length - 1] += character;
+				}
+			}
+
+			if (statement_parts.length < 3) {
+				throw new NanoError(`Invalid conditional expression: {{ ${expression_string} }}`);
+			}
+
+			return statement_parts.map(v => v.trim());
 		}
 
-		const [test, consequent, alternate] = statement_parts;
+		const [test, consequent, alternate] = return_conditional_statement_parts();
 
 		return new Node(NODE_TYPES[3], {
 			test: parse_expression(test),
@@ -775,7 +800,7 @@ export async function compile(nodes: Node[], input_data: NanoInputData = {}, inp
 	}
 
 	async function compile_tag_import(node: Node): Promise<string> {
-		const import_path_dir = compile_options.import_directory || default_options.import_directory || "";
+		const import_path_dir = compile_options.import_directory || default_options.import_directory || '';
 		const import_file_path = join_path(import_path_dir, node.path);
 
 		try {
@@ -793,7 +818,7 @@ export async function compile(nodes: Node[], input_data: NanoInputData = {}, inp
 			}
 
 			return compile(parse(scan(import_file)), import_data, input_methods, compile_options);
-		} catch(error) {
+		} catch (error) {
 			throw new NanoError(`Imported file does not exist: ${import_file_path}`);
 		}
 	}
