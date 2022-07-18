@@ -35,7 +35,7 @@ await render(template, data, filters, options);
 ### Syntax
 
 #### Variable access
-Both dot and bracket notation is supported. Undefined/null variables are output as empty strings.
+Both dot and bracket notation are supported. Undefined/null variables are output as empty strings.
 ```twig
 {{ value.nested.property }}
 ```
@@ -52,18 +52,13 @@ Filters are functions that can be applied to any variable or primitive value. Fi
 {{ my_array | first_item | to_uppercase }}
 ```
 
-#### Ternary operator
-```twig
-{{ foo == true ? "yes" : "no" }}
-```
-
 #### Expressions
-Nano support logical and binary expressions and can be used in combination with filters with any variable and/or primitive value
+Nano supports logical and binary expressions which can be used in combination with filters and variable/primitive values.
 ```twig
-{{ foo == true && !bar || baz >= 10 | times_two ? "yes" | to_uppercase : "no" }}
+{{ foo == true && !bar || 200 >= 10 | times_two ? "yes" : "no" | to_uppercase }}
 ```
 
-#### If/else
+#### If / else
 ```twig
 {% if foo > 100 && bar <= 5 | times_two %}
 	...
@@ -74,25 +69,30 @@ Nano support logical and binary expressions and can be used in combination with 
 {% endif%}
 ```
 
+#### Ternary operator
+```twig
+{{ foo == true ? "yes" : "no" }}
+```
+
 #### Loops
 ```twig
 {% for item in items %}
 	...
 {% endfor %}
 ```
-It's possible to get the index in the loop
+It's possible to get the index in the loop.
 ```twig
 {% for item, index in items %}
 	...
 {% endfor %}
 ```
-As well as loop over objects
+As well as loop over objects.
 ```twig
 {% for key, value in object %}
 	...
 {% endfor %}
 ```
-Filters can also be applied to variables
+Filters can also be applied to variables.
 ```twig
 {% for item, index in array | filtered | sorted %}
 	...
