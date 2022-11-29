@@ -100,7 +100,7 @@ will output
 
 #### Escape characters
 Tags can be marked with a `#` in the same fashion, which will escape the output.
-For a variable named `code` with the value
+In this example, for a variable named `code` with the value
 
 ```js
 '<script>/* test */</script>'
