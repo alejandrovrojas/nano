@@ -1,881 +1,1062 @@
 // Copyright (c) 2022 Alejandro V. Rojas. All rights reserved. MIT license.
 
 /**
+ * 	NANO – eval-free template engine
  *
- * 	v0.1.2
- *
- * 	Nano is a template engine initially made for use with Deno Deploy, which currently
- * 	doesn't support template engines that rely on eval() for evaluating expressions
- * 	at runtime. Nano currently supports logical and binary expressions but only using
- * 	variables passed during the rendering phase and/or primitive values i.e. strings,
- * 	numbers and booleans. Nano does still support all the basics like if/else/for
- * 	statements, nested loops, filters, and imports with props. Nano inherits most of
- * 	its syntax from the most commonly known template engines like Django, Twig, etc.
- *
- * 	USAGE
- * 	|	const template  =  <div>Hello {{ name | shout }}</div>
- * 	|	const data      =  { name: "Alejandro" }
- * 	|	const filters   =  { shout: value => value + '!' }
- * 	|
- * 	|	>  await render(template, data, filters)
- * 	|	>  <div>Hello Alejandro!</div>
- *
- * 	INB4
- * 	|	should have
- * 	|		[ ] keep track of indentation and line numbers for debugging/error messages
- * 	|	could have
- * 	|		[ ] expression groups ( )
- * 	|		[ ] proper mark/node types zzZzZzZzz...
- * 	|	won't have
- * 	|		[x] arithmetic operators + - / *
- * 	|		[x] inline object-like variable definitions -> {{ [1, 2, 2, 3] | unique }}
- *
- */
+ * 	should have
+ * 
+ * 		[] keep track of indentation for debugging/error messages
+ * 	could have
+ * 		[] proper type definitions for nodes/tokens zZzZzzZzz...
+ * 	won't have
+ * 		[x] inline object-like variable definitions
+ * */
 
-/**
- *
- * 	SCAN
- * 	input -> tokens -> marks
- *
- * 	lexer that splits the string builds a rough mark tree.
- * 	the goal in this step is to make sure the structure of all
- * 	blocks are valid, e.g. check for missing or duplicate tags.
- * 	invalid block statements or syntax errors are checked in the
- * 	next step when the marks are used to create nodes.
- *
- * 	|	0	BLOCK   		{% if/else/for %}
- * 	|	1	VARIABLE		{{ variable }}
- * 	|	2	COMMENT 		{# comment #}
- * 	|	3	TEXT    		<div>text</div>
- *
- **/
+//@ts-ignore
+import { join as join_path, isAbsolute as is_path_absolute } from 'https://deno.land/std@0.165.0/path/mod.ts';
 
-import { join as join_path } from 'https://deno.land/std@0.148.0/path/mod.ts';
+type TokenSpec = Array<[RegExp, string | null]>;
 
-class NanoError extends Error {
-	public name = 'NanoError';
-}
+function Tokenizer(input: string, token_spec: TokenSpec, line_offset = 1) {
+	let cursor = 0;
+	let line = line_offset;
+	let lookahead_token = get_next_token();
 
-class Mark {
-	type: string;
-	value: string;
-	marks: Mark[];
-
-	constructor(type: string, value: string, marks: Mark[] = []) {
-		this.type = type;
-		this.value = value;
-		this.marks = marks;
+	function lookahead() {
+		return lookahead_token;
 	}
-}
 
-type Token = string;
+	function has_remaining_tokens() {
+		return cursor < input.length;
+	}
 
-const MARK_TYPES = [
-	'block',
-	'tag',
-	'comment',
-	'text'
-];
-
-export function scan(input: string): Mark[] {
-	const RE_BLOCK = /^{%.*?%}$/;
-	const RE_TAG = /^{{.*?}}$/;
-	const RE_COMMENT = /^{#[^]*?#}$/;
-	const RE_ALL = /({%.*?%}|{{.*?}}|{#[^]*?#})/;
-	const RE_BREAK = /[\n\r\t]/g;
-	const RE_BREAK_IGNORE = /(<pre>|<!--|{#)[^]*?(<\/pre>|-->|#})/g;
-	const RE_STACK_BLOCK_TAG = /^\bif\b|^\bfor\b/;
-	const RE_VALID_BLOCK_TAG = /^\bif\b|^\bfor\b|^\belseif\b|^\belse\b/;
-
-	const marks: Mark[] = [];
-	const mark_stack: Mark[] = [];
-	const operation_stack: string[] = [];
-	const tokens: Token[] = trim_input(input).split(RE_ALL).filter(v => v);
-
-	for (let i = 0; i < tokens.length; i += 1) {
-		const mark_type = return_mark_type(tokens[i]);
-		let mark_value = tokens[i];
-
-		if (mark_type !== MARK_TYPES[3]) {
-			mark_value = mark_value.slice(2, -2).trim();
+	function get_next_token() {
+		if (!has_remaining_tokens()) {
+			return null;
 		}
 
-		if (mark_type === MARK_TYPES[0]) {
-			if (mark_value.startsWith('end')) {
-				let last_in_stack = mark_stack.pop() as Mark;
+		const current_input = input.slice(cursor);
 
-				const last_operation = operation_stack.pop();
-				const end_statement = mark_value.slice(3);
+		for (const [token_regexp, token_type] of token_spec) {
+			const token_match = get_token_match(token_regexp, current_input);
 
-				if (!RE_VALID_BLOCK_TAG.test(end_statement)) {
-					throw new NanoError(`Invalid {% ${mark_value} %} tag`);
+			if (token_match === null) {
+				continue;
+			}
+
+			const line_match = token_match.match(/\n/g);
+
+			if (line_match) {
+				line += line_match.length;
+			}
+
+			cursor += token_match.length;
+
+			if (token_type === null) {
+				return get_next_token();
+			}
+
+			return {
+				type: token_type,
+				value: token_match,
+				line: line,
+			};
+		}
+
+		throw new Error(`Unexpected token: "${current_input[0]}"  (line: ${line})`);
+	}
+
+	function get_token_match(token_regexp: RegExp, string_input: string) {
+		const regex_match = token_regexp.exec(string_input);
+		return regex_match ? regex_match[0] : null;
+	}
+
+	function advance_token(token_type: string) {
+		const current_token = lookahead_token;
+
+		if (current_token === null) {
+			throw_unexpected_end();
+		}
+
+		if (current_token.type !== token_type) {
+			throw new Error(`Unexpected token: "${current_token.value}" (line: ${line})`);
+		}
+
+		lookahead_token = get_next_token();
+
+		return current_token;
+	}
+
+	function throw_unexpected_end() {
+		throw new Error(`Unexpected end of input (line: ${line})`);
+	}
+
+	return {
+		lookahead,
+		advance_token,
+		throw_unexpected_end,
+	};
+}
+
+export function Parse(input_template: string) {
+	if (!input_template) {
+		return new Error('Missing input template string');
+	}
+
+	return StructureTemplate(ParseTemplate(input_template));
+}
+
+export function ParseTemplate(input_template: string) {
+	const tokens: Array<any> = [];
+	const split_rule = /(<!--[^]*?-->|<style.*>[^]*?<\/style>|<script.*>[^]*?<\/script>|\{[^]*?\})/;
+	const split_template = input_template.split(split_rule);
+
+	let line = 1;
+	let column = 1;
+
+	for (let index = 0; index < split_template.length; index += 1) {
+		let value = split_template[index];
+		let current_type = 'Text';
+
+		if (value.startsWith('<!--')) {
+			current_type = 'Comment';
+		}
+
+		if (value.startsWith('{#')) {
+			current_type = 'EscapedTag';
+			value = value.slice(2, -1);
+		}
+
+		if (value.startsWith('{!')) {
+			current_type = 'TrimmedTag';
+			value = value.slice(2, -1);
+		}
+
+		if (value.startsWith('{/')) {
+			current_type = 'ClosingTag';
+			value = value.slice(2, -1);
+		}
+
+		if (value.startsWith('{')) {
+			current_type = 'Tag';
+			value = value.slice(1, -1);
+		}
+
+		tokens.push({
+			type: current_type,
+			value: value,
+			line: line,
+			column: column,
+		});
+
+		const line_match = value.match(/\n/g);
+
+		if (line_match) {
+			line += line_match.length;
+			column = 0;
+		}
+
+		const last_newline = value.lastIndexOf('\n');
+
+		column += value.slice(last_newline > -1 ? last_newline : 0, value.length).length;
+	}
+
+	return tokens;
+}
+
+export function ParseExpression(input_expression: string, line_offset: number) {
+	const token_spec: TokenSpec = [
+		[/^\s+/, null],
+		[/^\/\/.*/, null],
+		[/^\/\*[\s\S]*?\*\//, null],
+
+		[/^\(/, 'L_PARENTHESIS'],
+		[/^\)/, 'R_PARENTHESIS'],
+		[/^\[/, 'L_BRACKET'],
+		[/^\]/, 'R_BRACKET'],
+		[/^\{/, 'L_CURLY'],
+		[/^\}/, 'R_CURLY'],
+		[/^\,/, 'COMMA'],
+		[/^\./, 'DOT'],
+
+		[/^\bimport\b/, 'IMPORT'],
+		[/^\bwith\b/, 'WITH'],
+		[/^\bfor\b/, 'FOR'],
+		[/^\bin\b/, 'IN'],
+		[/^\bif\b/, 'IF'],
+		[/^\belse\b/, 'ELSE'],
+		[/^\btrue\b/, 'TRUE'],
+		[/^\bfalse\b/, 'FALSE'],
+		[/^\bnull\b/, 'NULL'],
+
+		[/^[+\-]/, 'ADDITIVE'],
+		[/^[*\/]/, 'MULTIPLICATIVE'],
+
+		[/^[=!]=/, 'EQUALITY'],
+		[/^[><]=?/, 'RELATIONAL'],
+		[/^&&/, 'AND'],
+		[/^\|\|/, 'OR'],
+		[/^!/, 'NOT'],
+
+		[/^\d+(\.\d+)?/, 'NUMBER'],
+		[/^[A-Za-z0-9_$ß]+/, 'IDENTIFIER'],
+
+		[/^\?/, 'QUESTIONMARK'],
+		[/^\:/, 'COLON'],
+
+		[/^"[^"]*"/, 'STRING'],
+		[/^'[^']*'/, 'STRING'],
+	];
+
+	const tokenizer = Tokenizer(input_expression, token_spec, line_offset);
+
+	function Root() {
+		switch (tokenizer.lookahead().type) {
+			case 'IMPORT':
+				return ImportStatement();
+			case 'FOR':
+				return ForStatement();
+			case 'IF':
+				return IfStatement();
+			case 'ELSE':
+				return ElseStatement();
+			default:
+				return Expression();
+		}
+	}
+
+	function ImportStatement() {
+		tokenizer.advance_token('IMPORT');
+
+		const path_token = VariableExpression();
+		const key_value_pairs: Array<any> = [];
+
+		if (tokenizer.lookahead() && tokenizer.lookahead().type === 'WITH') {
+			tokenizer.advance_token('WITH');
+			tokenizer.advance_token('L_PARENTHESIS');
+
+			do {
+				const pair = KeyValuePair();
+				key_value_pairs.push(pair.value);
+			} while (tokenizer.lookahead() && tokenizer.lookahead().type === 'COMMA' && tokenizer.advance_token('COMMA'));
+
+			tokenizer.advance_token('R_PARENTHESIS');
+		}
+
+		return {
+			type: 'ImportStatement',
+			path: path_token,
+			with: key_value_pairs,
+		};
+	}
+
+	function KeyValuePair() {
+		const key = Identifier();
+		tokenizer.advance_token('COLON');
+		const value = VariableExpression();
+
+		return {
+			type: 'KeyValuePair',
+			value: {
+				key: key.value,
+				value,
+			},
+		};
+	}
+
+	function IfStatement() {
+		tokenizer.advance_token('IF');
+
+		const test = Expression();
+
+		return {
+			type: 'IfStatement',
+			test: test,
+		};
+	}
+
+	function ElseStatement() {
+		tokenizer.advance_token('ELSE');
+
+		if (tokenizer.lookahead() && tokenizer.lookahead().type === 'IF') {
+			const if_statement = IfStatement();
+
+			return {
+				type: 'ElseIfStatement',
+				test: if_statement.test,
+			};
+		}
+
+		return {
+			type: 'ElseStatement',
+		};
+	}
+
+	function ForStatement() {
+		tokenizer.advance_token('FOR');
+
+		/**
+		 * 	@TODO: throw if variables.length > 2.
+		 * */
+		const variables = IdentifierList();
+
+		tokenizer.advance_token('IN');
+
+		const iterator = VariableExpression();
+
+		return {
+			type: 'ForStatement',
+			variables: variables.map((t: any) => t.value),
+			iterator,
+		};
+	}
+
+	function IdentifierList() {
+		const declarations: Array<any> = [];
+
+		do {
+			declarations.push(Identifier());
+		} while (tokenizer.lookahead() && tokenizer.lookahead().type === 'COMMA' && tokenizer.advance_token('COMMA'));
+
+		return declarations;
+	}
+
+	function BinaryExpression(expression_method, token_type) {
+		let left = expression_method();
+
+		while (tokenizer.lookahead() && tokenizer.lookahead().type === token_type) {
+			const operator_token = tokenizer.advance_token(token_type);
+			const right = expression_method();
+
+			left = {
+				type: 'BinaryExpression',
+				operator: operator_token.value,
+				left,
+				right,
+			};
+		}
+
+		return left;
+	}
+
+	function LogicalExpression(expression_method, token_type) {
+		let left = expression_method();
+
+		while (tokenizer.lookahead() && tokenizer.lookahead().type === token_type) {
+			const operator_token = tokenizer.advance_token(token_type);
+			const right = expression_method();
+
+			left = {
+				type: 'LogicalExpression',
+				operator: operator_token.value,
+				left,
+				right,
+			};
+		}
+
+		return left;
+	}
+
+	function Expression() {
+		return TernaryExpression();
+	}
+
+	function TernaryExpression() {
+		const left = OrExpression();
+
+		if (tokenizer.lookahead() && tokenizer.lookahead().type === 'QUESTIONMARK') {
+			tokenizer.advance_token('QUESTIONMARK');
+
+			const consequent = Expression();
+
+			tokenizer.advance_token('COLON');
+
+			const alternate = Expression();
+
+			return {
+				type: 'TernaryExpression',
+				test: left,
+				consequent,
+				alternate,
+			};
+		} else {
+			return left;
+		}
+	}
+
+	function OrExpression() {
+		return LogicalExpression(AndExpression, 'AND');
+	}
+
+	function AndExpression() {
+		return LogicalExpression(EqualityExpression, 'OR');
+	}
+
+	function EqualityExpression() {
+		return BinaryExpression(RelationalExpression, 'EQUALITY');
+	}
+
+	function RelationalExpression() {
+		return BinaryExpression(AddExpression, 'RELATIONAL');
+	}
+
+	function AddExpression() {
+		return BinaryExpression(MultiExpression, 'ADDITIVE');
+	}
+
+	function MultiExpression() {
+		return BinaryExpression(UnaryExpression, 'MULTIPLICATIVE');
+	}
+
+	function UnaryExpression() {
+		let unary_operator: any = null;
+
+		if (tokenizer.lookahead()) {
+			switch (tokenizer.lookahead().type) {
+				case 'ADDITIVE':
+					unary_operator = tokenizer.advance_token('ADDITIVE');
+					break;
+
+				case 'NOT':
+					unary_operator = tokenizer.advance_token('NOT');
+					break;
+			}
+		}
+
+		if (unary_operator !== null) {
+			return {
+				type: 'UnaryExpression',
+				operator: unary_operator.value,
+				value: UnaryExpression(),
+			};
+		}
+
+		return VariableExpression();
+	}
+
+	function VariableExpression() {
+		const variable_call = VariableCall();
+
+		if (tokenizer.lookahead() && tokenizer.lookahead().type === 'L_PARENTHESIS') {
+			return FunctionCall(variable_call);
+		}
+
+		return variable_call;
+	}
+
+	function VariableCall() {
+		let variable = PrimaryExpression();
+
+		while (
+			tokenizer.lookahead() &&
+			(tokenizer.lookahead().type === 'DOT' || tokenizer.lookahead().type === 'L_BRACKET')
+		) {
+			if (tokenizer.lookahead().type === 'DOT') {
+				tokenizer.advance_token('DOT');
+
+				const property = Identifier();
+
+				variable = {
+					type: 'VariableCall',
+					variable,
+					property: {
+						type: 'StringLiteral',
+						value: property.value,
+					},
+				};
+			} else if (tokenizer.lookahead().type === 'L_BRACKET') {
+				tokenizer.advance_token('L_BRACKET');
+
+				const property = Expression();
+
+				tokenizer.advance_token('R_BRACKET');
+
+				variable = {
+					type: 'VariableCall',
+					variable,
+					property,
+				};
+			}
+		}
+
+		return variable;
+	}
+
+	function FunctionCall(variable_call) {
+		let current_expression = {
+			type: 'FunctionCall',
+			function: variable_call,
+			arguments: FunctionArguments(),
+		};
+
+		if (tokenizer.lookahead() && tokenizer.lookahead().type === 'L_PARENTHESIS') {
+			current_expression = FunctionCall(current_expression);
+		}
+
+		return current_expression;
+	}
+
+	function FunctionArguments() {
+		tokenizer.advance_token('L_PARENTHESIS');
+		const argument_list =
+			tokenizer.lookahead() && tokenizer.lookahead().type !== 'R_PARENTHESIS' ? FunctionArgumentList() : [];
+		tokenizer.advance_token('R_PARENTHESIS');
+
+		return argument_list;
+	}
+
+	function FunctionArgumentList() {
+		const argument_list: Array<any> = [];
+
+		do {
+			argument_list.push(VariableExpression());
+		} while (tokenizer.lookahead() && tokenizer.lookahead().type === 'COMMA' && tokenizer.advance_token('COMMA'));
+
+		return argument_list;
+	}
+
+	function PrimaryExpression() {
+		if (!tokenizer.lookahead()) {
+			tokenizer.throw_unexpected_end();
+		}
+
+		switch (tokenizer.lookahead().type) {
+			case 'L_PARENTHESIS':
+				return ParenthesisExpression();
+			case 'IDENTIFIER':
+				return Identifier();
+			default:
+				return Literal();
+		}
+	}
+
+	function ParenthesisExpression() {
+		tokenizer.advance_token('L_PARENTHESIS');
+		const expression = Expression();
+		tokenizer.advance_token('R_PARENTHESIS');
+
+		return expression;
+	}
+
+	function Identifier() {
+		const token = tokenizer.advance_token('IDENTIFIER');
+		return {
+			type: 'Identifier',
+			value: token.value,
+		};
+	}
+
+	function Literal() {
+		switch (tokenizer.lookahead().type) {
+			case 'STRING':
+				return StringLiteral();
+			case 'NUMBER':
+				return NumericLiteral();
+			case 'TRUE':
+				return TrueLiteral();
+			case 'FALSE':
+				return FalseLiteral();
+			case 'NULL':
+				return NullLiteral();
+		}
+	}
+
+	function TrueLiteral() {
+		tokenizer.advance_token('TRUE');
+
+		return {
+			type: 'BooleanLiteral',
+			value: true,
+		};
+	}
+
+	function FalseLiteral() {
+		tokenizer.advance_token('FALSE');
+
+		return {
+			type: 'BooleanLiteral',
+			value: false,
+		};
+	}
+
+	function NullLiteral() {
+		tokenizer.advance_token('NULL');
+
+		return {
+			type: 'NullLiteral',
+			value: null,
+		};
+	}
+
+	function StringLiteral() {
+		const token = tokenizer.advance_token('STRING');
+
+		return {
+			type: 'StringLiteral',
+			value: token.value.slice(1, -1),
+		};
+	}
+
+	function NumericLiteral() {
+		const token = tokenizer.advance_token('NUMBER');
+
+		return {
+			type: 'NumericLiteral',
+			value: Number(token.value),
+		};
+	}
+
+	return Root();
+}
+
+export function StructureTemplate(node_list): any[] {
+	const node_tree: Array<any> = [];
+	const node_buffer: Array<any> = [];
+
+	function push_node(node: any) {
+		if (node_buffer.length > 0) {
+			node_buffer[node_buffer.length - 1].body.push(node);
+		} else {
+			node_tree.push(node);
+		}
+	}
+
+	function ensure_open_blocks_in_buffer(node) {
+		if (node_buffer.length === 0) {
+			throw new Error(`Unexpected statement (${node.line}:${node.column})`);
+		}
+	}
+
+	for (let index = 0; index < node_list.length; index += 1) {
+		const node = node_list[index];
+		const { line, column } = node;
+
+		switch (node.type) {
+			case 'Text':
+				const last = node_buffer[node_buffer.length - 1];
+				const inside_trim_block = last && last.trim;
+				const inside_escape_block = last && last.escape;
+
+				push_node({
+					type: 'Text',
+					value: node.value,
+					line,
+					trim: inside_trim_block,
+					escape: inside_escape_block
+				});
+				break;
+
+			case 'Tag':
+			case 'EscapedTag':
+			case 'TrimmedTag':
+				const parsed_expression = ParseExpression(node.value, line);
+				const trimmed_tag = node.type === 'TrimmedTag';
+				const escaped_tag = node.type === 'EscapedTag';
+
+				switch (parsed_expression.type) {
+					case 'IfStatement':
+						node_buffer.push({
+							type: 'IfStatement',
+							test: parsed_expression.test,
+							body: [],
+							alternate: null,
+							line,
+							trim: trimmed_tag,
+							escape: escaped_tag
+						});
+						break;
+
+					case 'ForStatement':
+						node_buffer.push({
+							type: 'ForStatement',
+							variables: parsed_expression.variables,
+							iterator: parsed_expression.iterator,
+							body: [],
+							line,
+							trim: trimmed_tag,
+							escape: escaped_tag
+						});
+						break;
+
+					case 'ElseIfStatement':
+						node_buffer.push({
+							type: 'ElseIfStatement',
+							test: parsed_expression.test,
+							body: [],
+							alternate: null,
+							line,
+							trim: trimmed_tag,
+							escape: escaped_tag
+						});
+						break;
+
+					case 'ElseStatement':
+						node_buffer.push({
+							type: 'ElseStatement',
+							body: [],
+							line,
+							trim: trimmed_tag,
+							escape: escaped_tag
+						});
+						break;
+
+					case 'ImportStatement':
+						push_node({
+							type: 'ImportStatement',
+							path: parsed_expression.path,
+							with: parsed_expression.with,
+							trim: trimmed_tag,
+							escape: escaped_tag
+						});
+						break;
+
+					default:
+						push_node({
+							type: 'Tag',
+							value: parsed_expression,
+							line,
+							trim: trimmed_tag,
+							escape: escaped_tag
+						});
 				}
+				break;
 
-				if (!last_operation) {
-					throw new NanoError(`Redundant {% ${mark_value} %} tag`);
-				} else {
-					const last_operation_statement = last_operation.match(RE_STACK_BLOCK_TAG);
+			case 'ClosingTag':
+				ensure_open_blocks_in_buffer(node);
 
-					if (last_operation_statement && last_operation_statement.pop() !== end_statement) {
-						throw new NanoError(`Invalid {% ${last_operation} %} statement`);
+				function nest_buffered_nodes() {
+					const last_buffered = node_buffer.pop();
+					const last_in_buffer = node_buffer[node_buffer.length - 1];
+
+					switch (last_buffered.type) {
+						case 'ElseIfStatement':
+							ensure_open_blocks_in_buffer(last_buffered);
+							last_buffered.type = 'IfStatement';
+							last_in_buffer.alternate = [last_buffered];
+							nest_buffered_nodes();
+							break;
+
+						case 'ElseStatement':
+							ensure_open_blocks_in_buffer(last_buffered);
+							last_in_buffer.alternate = last_buffered.body;
+							nest_buffered_nodes();
+							break;
+
+						default:
+							const check_map = {
+								if: 'IfStatement',
+								for: 'ForStatement',
+							};
+
+							if (!check_map[node.value]) {
+								throw new Error(`Invalid closing tag "${node.value}" (line: ${node.line})`);
+							}
+
+							if (check_map[node.value] !== last_buffered.type) {
+								throw new Error(
+									`Incorrect closing tag "${node.value}" ${last_buffered.type} (line: ${node.line})`
+								);
+							}
+
+							push_node(last_buffered);
 					}
 				}
 
-				traverse_mark_stack(last_in_stack, mark_type);
-			} else {
-				if (!RE_VALID_BLOCK_TAG.test(mark_value)) {
-					throw new NanoError(`Invalid {% ${mark_value} %} statement`);
-				}
-
-				if (RE_STACK_BLOCK_TAG.test(mark_value)) {
-					operation_stack.push(mark_value);
-				}
-
-				mark_stack.push(new Mark(mark_type, mark_value));
-			}
-		} else {
-			output_mark(new Mark(mark_type, mark_value));
+				nest_buffered_nodes();
+				break;
 		}
 	}
 
-	if (mark_stack.length > 0) {
-		throw new NanoError(`Missing end tag inside {% ${mark_stack[0].value} %} block`);
+	if (node_buffer.length > 0) {
+		const open_block = node_buffer.shift();
+		throw new Error(`Missing closing tag inside block (line: ${open_block.line})`);
 	}
 
-	function trim_input(raw_input: string) {
-		const input_pre = raw_input.match(RE_BREAK_IGNORE);
-		const input_trim = raw_input.replace(RE_BREAK, '');
-
-		raw_input = input_trim;
-
-		if (input_pre) {
-			const input_trim_pre = input_trim.match(RE_BREAK_IGNORE);
-
-			if (input_trim_pre) {
-				for (let match = 0; match < input_pre.length; match += 1) {
-					raw_input = raw_input.replace(input_trim_pre[match], input_pre[match]);
-				}
-			}
-		}
-
-		return raw_input;
-	}
-
-	function traverse_mark_stack(last_in_stack: Mark, mark_type: string) {
-		if (last_in_stack.value.startsWith('elseif')) {
-			const else_mark = new Mark(mark_type, 'else');
-			const if_mark = new Mark(mark_type, last_in_stack.value.slice(4), last_in_stack.marks);
-
-			mark_stack.push(else_mark);
-			output_mark(if_mark);
-		} else {
-			output_mark(last_in_stack);
-		}
-
-		if (last_in_stack.value.startsWith('else')) {
-			last_in_stack = mark_stack.pop() as Mark;
-			traverse_mark_stack(last_in_stack, mark_type);
-		}
-	}
-
-	function output_mark(mark: Mark) {
-		if (mark_stack.length > 0) {
-			mark_stack[mark_stack.length - 1].marks.push(mark);
-		} else {
-			marks.push(mark);
-		}
-	}
-
-	function return_mark_type(token: Token) {
-		if (RE_BLOCK.test(token)) {
-			return MARK_TYPES[0];
-		} else if (RE_TAG.test(token)) {
-			return MARK_TYPES[1];
-		} else if (RE_COMMENT.test(token)) {
-			return MARK_TYPES[2];
-		} else {
-			return MARK_TYPES[3];
-		}
-	}
-
-	return marks;
+	return node_tree;
 }
 
-/**
- *
- * 	PARSE
- * 	marks -> nodes
- *
- * 	parser that takes the initial tree of marks and builds a tree of
- * 	nodes with more information about each mark match. this step takes
- * 	care of syntax formatting and should provide all relevant properties
- * 	to the renderer.
- *
- * 	|	0 	value_primitive       		"text" | 100 | true | false
- * 	|	1 	value_variable        		variable.dot.separated / variable['named-key']
- * 	|	2 	expression_filter     		variable | filter_1 | filter_2
- * 	|	3 	expression_conditional		variable ? 'value_if_true' : 'value_if_false'
- * 	|	4 	expression_logical    		A && B || C
- * 	|	5 	expression_unary      		!A
- * 	|	6 	expression_binary     		== != > < >= <=
- * 	|	7 	block_if              		{% if condition_1 %} {% elseif condition_2 %} {% endif %}
- * 	|	8 	block_for             		{% for num, index in numbers | unique %} {% endfor %}
- * 	|	9 	tag_comment           		{# multi-line comment #}
- * 	|	10	tag_import            		{{ import 'path/to/file.html' with { name: value } }}
- *
- **/
-
-class Node {
-	[key: string]: any;
-
-	constructor(type: string, properties: any) {
-		this.type = type;
-
-		for (const key in properties) {
-			this[key] = properties[key];
-		}
-	}
-}
-
-const NODE_TYPES = [
-	'value_primitive',
-	'value_variable',
-	'expression_filter',
-	'expression_conditional',
-	'expression_logical',
-	'expression_unary',
-	'expression_binary',
-	'block_if',
-	'block_for',
-	'tag_comment',
-	'tag_import',
-];
-
-export function parse(marks: Mark[]): Node[] {
-	const RE_QUOTES = /["']/;
-	const RE_ACCESS_DOT = /\./;
-	const RE_ACCESS_BRACKET = /\[["']|['"]\]/;
-	const RE_VARIABLE_ARITHMETIC_LIKE = /[\+\-\*\/\%]/;
-	const RE_VARIABLE_OBJECT_LIKE = /[\{\}\[\]]/;
-	const RE_VARIABLE_EMPTY = /^['"]['"]$/;
-	const RE_VARIABLE_IN_QUOTES = /^['"].+?['"]$/;
-	const RE_VARIABLE_BRACKET_NOTATION = /\[['"]/;
-	const RE_VARIABLE_DIGIT = /^-?(\d|\.\d)+$/;
-	const RE_VARIABLE_BOOLEAN = /^(true|false)$/;
-	const RE_VARIABLE_FALSY = /^(null|undefined)$/;
-	const RE_VARIABLE_VALID = /^[0-9a-zA-Z_$]*$/;
-	const RE_KEYWORD_IF = /^if /;
-	const RE_KEYWORD_FOR = /^for | in /;
-	const RE_KEYWORD_IMPORT = /^import | with /;
-	const RE_OPERATOR_NOT = /(\!(?!\=))/;
-	const RE_OPERATOR_AND = /( \&\& )/;
-	const RE_OPERATOR_OR = /( \|\| )/;
-	const RE_OPERATOR_CONDITIONAL = / \? [^]*? \: /;
-	const RE_OPERATOR_LOGICAL = /( ?\!(?!\=)| \&\& | \|\| )/g;
-	const RE_OPERATOR_BINARY = / ?(==|!=|>=|<=|>|<) ?/g;
-	const RE_OPERATOR_FILTER = / ?\| ?/;
-	const RE_OPERATOR_INDEX = /\, ?/;
-
-	const nodes = [];
-
-	function parse_value_text(mark: Mark) {
-		return new Node(NODE_TYPES[0], {
-			value: mark.value,
-		});
-	}
-
-	function parse_value_variable(value_string: string): Node {
-		if (RE_VARIABLE_IN_QUOTES.test(value_string)) {
-			return new Node(NODE_TYPES[0], {
-				value: value_string.slice(1, -1)
-			});
+export async function RenderTemplate(parsed_template: any, input_data: InputData, input_settings: InputSettings) {
+	async function Text(node) {
+		if (node.trim) {
+			return return_trimmed_value(node.value);
 		}
 
-		if (RE_VARIABLE_FALSY.test(value_string)) {
-			function return_falsy_value() {
-				switch (value_string) {
-					case 'null': return null;
-					case 'undefined': return undefined;
-				}
-			}
-
-			return new Node(NODE_TYPES[0], {
-				value: return_falsy_value(),
-			});
+		if (node.escape) {
+			return return_escaped_value(node.value);
 		}
 
-		if (RE_VARIABLE_DIGIT.test(value_string)) {
-			return new Node(NODE_TYPES[0], {
-				value: /\./.test(value_string) ? parseFloat(value_string) : parseInt(value_string),
-			});
-		}
-
-		if (RE_VARIABLE_BOOLEAN.test(value_string)) {
-			return new Node(NODE_TYPES[0], {
-				value: value_string === 'true' ? true : false,
-			});
-		}
-
-		if (RE_VARIABLE_BRACKET_NOTATION.test(value_string)) {
-			if (RE_ACCESS_DOT.test(value_string) && RE_ACCESS_BRACKET.test(value_string)) {
-				throw new NanoError(`Avoid combined object access notation: "${value_string}"`);
-			}
-
-			const variable_parts = value_string.split(RE_ACCESS_BRACKET);
-			const variable_root = variable_parts.shift() as string;
-			const variables_nested = variable_parts.filter(v => v);
-
-			/**
-			 * 	variable_root["nested"]["properties"] are parsed as strings
-			 * 	by default and therefore don't have to be checked as valid
-			 * 	identifiers to the same extent
-			 */
-
-			if (!RE_VARIABLE_VALID.test(variable_root)) {
-				throw new NanoError(`Invalid variable name: "${variable_root}"`);
-			}
-
-			return new Node(NODE_TYPES[1], {
-				properties: [variable_root, ...variables_nested],
-			});
-		}
-
-		if (RE_VARIABLE_ARITHMETIC_LIKE.test(value_string)) {
-			throw new NanoError(`Arithmetic operators are not supported: "${value_string}"`);
-		}
-
-		if (RE_VARIABLE_OBJECT_LIKE.test(value_string)) {
-			throw new NanoError(`Inline object or array variables are not supported`);
-		}
-
-		const variable_parts = value_string.split(RE_ACCESS_DOT).map(v => v.trim());
-
-		for (const part of variable_parts) {
-			if (!RE_VARIABLE_EMPTY.test(part) && !RE_VARIABLE_VALID.test(part)) {
-				throw new NanoError(`Invalid variable name: "${value_string}"`);
-			}
-		}
-
-		return new Node(NODE_TYPES[1], {
-			properties: variable_parts,
-		});
-	}
-
-	function parse_expression_filter(expression_string: string): Node {
-		const statement_parts = expression_string.split(RE_OPERATOR_FILTER).map(v => v.trim());
-		const variable = statement_parts.shift() as string;
-		const filters = statement_parts.filter(v => v);
-
-		if (filters.length === 0) {
-			throw new NanoError('Invalid filter syntax');
-		}
-
-		for (const filter of filters) {
-			if (!RE_VARIABLE_VALID.test(filter)) {
-				throw new NanoError(`Invalid filter name: "${filter}"`);
-			}
-		}
-
-		return new Node(NODE_TYPES[2], {
-			value: parse_value_variable(variable),
-			filters: filters,
-		});
-	}
-
-	function parse_expression_conditional(expression_string: string): Node {
-		function return_conditional_statement_parts() {
-			const statement_parts = [""];
-			let is_string_in_quotes = false;
-
-			for (const character of expression_string) {
-				if (RE_QUOTES.test(character)) {
-					is_string_in_quotes = !is_string_in_quotes;
-				}
-
-				if (!is_string_in_quotes && (character === '?' || character === ':')) {
-					statement_parts.push('');
-				} else {
-					statement_parts[statement_parts.length - 1] += character;
-				}
-			}
-
-			if (statement_parts.length < 3) {
-				throw new NanoError(`Invalid conditional expression: {{ ${expression_string} }}`);
-			}
-
-			return statement_parts.map(v => v.trim());
-		}
-
-		const [test, consequent, alternate] = return_conditional_statement_parts();
-
-		return new Node(NODE_TYPES[3], {
-			test: parse_expression(test),
-			consequent: parse_value_like_expression(consequent),
-			alternate: parse_value_like_expression(alternate),
-		});
-	}
-
-	function parse_expression_logical(expression_string: string): Node {
-		/**
-		 * 	A or B and C      	-->	A or (B and C)
-		 * 	A and B or C and D 	-->	(A and B) or (C and D)
-		 * 	A and B and C or D 	-->	((A and B) and C) or D
-		 * 	not A and B or C    	-->	((not A) and B) or C
-		 * */
-
-		const split_or = expression_string.split(RE_OPERATOR_OR);
-
-		if (split_or.length >= 3) {
-			const [left, operator, ...right] = split_or;
-
-			return new Node(NODE_TYPES[4], {
-				operator: '||',
-				left: parse_expression_logical(left),
-				right: parse_expression_logical(right.join('')),
-			});
-		}
-
-		const split_and = expression_string.split(RE_OPERATOR_AND);
-
-		if (split_and.length >= 3) {
-			const [left, operator, ...right] = split_and;
-
-			return new Node(NODE_TYPES[4], {
-				operator: '&&',
-				left: parse_expression_logical(left),
-				right: parse_expression_logical(right.join('')),
-			});
-		}
-
-		const split_not = expression_string.split(RE_OPERATOR_NOT);
-
-		if (split_not.length === 3) {
-			const [_, operator, variable] = split_not;
-
-			return new Node(NODE_TYPES[5], {
-				operator: '!',
-				value: parse_expression_logical(variable),
-			});
-		}
-
-		return parse_expression(expression_string);
-	}
-
-	function parse_expression_binary(expression_string: string): Node {
-		const [left, operator, right] = expression_string.split(RE_OPERATOR_BINARY);
-
-		return new Node(NODE_TYPES[6], {
-			operator: operator,
-			left: parse_expression(left),
-			right: parse_expression(right),
-		});
-	}
-
-	function parse_value_like_expression(expression_string: string): Node {
-		if (RE_OPERATOR_FILTER.test(expression_string)) {
-			return parse_expression_filter(expression_string);
-		}
-
-		return parse_value_variable(expression_string);
-	}
-
-	function parse_expression(expression_string: string): Node {
-		if (RE_OPERATOR_CONDITIONAL.test(expression_string)) {
-			return parse_expression_conditional(expression_string);
-		}
-
-		if (RE_OPERATOR_LOGICAL.test(expression_string)) {
-			return parse_expression_logical(expression_string);
-		}
-
-		if (RE_OPERATOR_BINARY.test(expression_string)) {
-			return parse_expression_binary(expression_string);
-		}
-
-		if (RE_OPERATOR_FILTER.test(expression_string)) {
-			return parse_expression_filter(expression_string);
-		}
-
-		return parse_value_variable(expression_string);
-	}
-
-	function parse_block_if(mark: Mark): Node {
-		const [test] = mark.value.split(RE_KEYWORD_IF).filter(v => v);
-
-		function return_else_marks() {
-			const last_mark = mark.marks[mark.marks.length - 1];
-			const has_else_block = last_mark && last_mark.type === 'block' && last_mark.value === 'else';
-
-			if (has_else_block) {
-				const else_mark = mark.marks.pop() as Mark;
-				return else_mark.marks;
-			} else {
-				return [];
-			}
-		}
-
-		const else_marks = return_else_marks();
-		const consequent = mark.marks.length > 0 ? mark.marks : null;
-		const alternate = else_marks.length > 0 ? else_marks : null;
-
-		return new Node(NODE_TYPES[7], {
-			test: parse_expression(test),
-			consequent: consequent ? parse(consequent) : null,
-			alternate: alternate ? parse(alternate) : null,
-		});
-	}
-
-	function parse_block_for(mark: Mark): Node {
-		const statement_parts = mark.value.split(RE_KEYWORD_FOR).filter(v => v);
-
-		if (statement_parts.length !== 2) {
-			throw new NanoError('Invalid for statement');
-		}
-
-		const [variable, iterator] = statement_parts;
-		const variable_parts = variable.split(RE_OPERATOR_INDEX);
-
-		for (const part of variable_parts) {
-			if (!RE_VARIABLE_VALID.test(part)) {
-				throw new NanoError(`Invalid variable name: "${part}"`);
-			}
-		}
-
-		return new Node(NODE_TYPES[8], {
-			variables: variable_parts,
-			iterator: parse_expression(iterator),
-			body: parse(mark.marks),
-		});
-	}
-
-	function parse_tag_comment(mark: Mark): Node {
-		return new Node(NODE_TYPES[9], {
-			value: mark.value,
-		});
-	}
-
-	function parse_tag_import(mark: Mark): Node {
-		const [filepath, variables] = mark.value.split(RE_KEYWORD_IMPORT).filter(v => v).map(v => v.trim());
-		const trimmed_filepath = filepath.slice(1, -1);
-
-		if (!RE_VARIABLE_IN_QUOTES.test(filepath)) {
-			throw new NanoError('Import path must be in quotes');
-		}
-
-		if (!trimmed_filepath) {
-			throw new NanoError('Invalid import path');
-		}
-
-		return new Node(NODE_TYPES[10], {
-			path: trimmed_filepath,
-			variables: variables ? return_object_map(variables) : null,
-		});
-
-		function return_object_map(variables: string): Node {
-			try {
-				const list = variables.slice(1, -1).trim();
-				const pairs = list.split(',').map(v => v.trim());
-
-				return pairs.reduce((map, pair) => {
-					const [key, value] = pair.split(':').map(v => v.trim());
-					return { ...map, [key]: parse_expression(value) };
-				}, {});
-			} catch {
-				throw new NanoError('Invalid import variable object');
-			}
-		}
-	}
-
-	function render_block_mark(mark: Mark): Node {
-		if (mark.value.startsWith('if ')) {
-			return parse_block_if(mark);
-		}
-
-		if (mark.value.startsWith('for ')) {
-			return parse_block_for(mark);
-		}
-
-		throw new NanoError(`Invalid {% ${mark.value} %} block`);
-	}
-
-	function render_tag_mark(mark: Mark): Node {
-		if (RE_KEYWORD_IMPORT.test(mark.value)) {
-			return parse_tag_import(mark);
-		}
-
-		return parse_expression(mark.value);
-	}
-
-	function render_comment_mark(mark: Mark): Node {
-		return parse_tag_comment(mark);
-	}
-
-	function render_text_mark(mark: Mark): Node {
-		return parse_value_text(mark);
-	}
-
-	for (const mark of marks) {
-		switch (mark.type) {
-			case MARK_TYPES[0]:
-				nodes.push(render_block_mark(mark));
-				break;
-			case MARK_TYPES[1]:
-				nodes.push(render_tag_mark(mark));
-				break;
-			case MARK_TYPES[2]:
-				nodes.push(render_comment_mark(mark));
-				break;
-			case MARK_TYPES[3]:
-				nodes.push(render_text_mark(mark));
-				break;
-		}
-	}
-
-	return nodes;
-}
-
-/**
- *
- * 	COMPILE
- * 	nodes -> output
- *
- * 	interpreter that finally renders the nodes in relation
- * 	to the data object. this function has to be async because
- * 	Deno Deploy doesn't support readFileSync yet.
- *
- * */
-
-type NanoInputData = {
-	[key: string]: any;
-};
-
-type NanoInputMethods = {
-	[key: string]: (...args: any[]) => any;
-};
-
-type NanoOptions = {
-	display_comments?: boolean;
-	import_directory?: string;
-};
-
-export async function compile(nodes: Node[], input_data: NanoInputData = {}, input_methods: NanoInputMethods = {}, input_options?: NanoOptions): Promise<string> {
-	const default_options: NanoOptions = { display_comments: false, import_directory: '' };
-	const compile_options: NanoOptions = { ...default_options, ...input_options };
-
-	const output: string[] = [];
-
-	function return_type(value: any): string {
-		return Object.prototype.toString.call(value).slice(8, -1).toLowerCase();
-	}
-
-	async function compile_value_text(node: Node): Promise<string> {
 		return node.value;
 	}
 
-	async function compile_value_variable(node: Node): Promise<any> {
-		return node.properties.reduce((parent: any, property: string) => {
-			if (parent !== undefined && parent[property] !== undefined) {
-				return parent[property];
-			}
-		}, input_data);
-	}
+	async function Tag(node) {
+		const value = await render_node(node.value);
 
-	async function compile_expression_filter(node: Node): Promise<any> {
-		const variable_value = await compile_node(node.value);
-		const filtered_value = node.filters.reduce((processed_value: any, filter: string) => {
-			if (input_methods[filter] === undefined) {
-				throw new NanoError(`Method "${filter}" is undefined`);
-			}
-			return input_methods[filter](processed_value);
-		}, variable_value);
-
-		return filtered_value;
-	}
-
-	async function compile_expression_conditional(node: Node): Promise<any> {
-		const test = await compile_node(node.test);
-
-		if (test) {
-			return compile_node(node.consequent);
-		} else {
-			return compile_node(node.alternate);
-		}
-	}
-
-	async function compile_expression_logical(node: Node): Promise<boolean | undefined> {
-		const left = await compile_node(node.left);
-		const right = await compile_node(node.right);
-
-		switch (node.operator) {
-			case "&&": return left && right;
-			case "||": return left || right;
-		}
-	}
-
-	async function compile_expression_binary(node: Node): Promise<boolean | undefined> {
-		const left = await compile_node(node.left);
-		const right = await compile_node(node.right);
-
-		switch(node.operator) {
-			case '==': return left === right;
-			case '!=': return left !== right;
-			case '>': return left > right;
-			case '<': return left < right;
-			case '>=': return left >= right;
-			case '<=': return left <= right;
-		}
-	}
-
-	async function compile_expression_unary(node: Node): Promise<boolean | undefined> {
-		const value = await compile_node(node.value);
-
-		switch(node.operator) {
-			case '!': return !value;
-		}
-	}
-
-	async function compile_block_if(node: Node): Promise<string> {
-		const block_output: string[] = [];
-		const test = await compile_node(node.test);
-
-		if (test) {
-			if (node.consequent) {
-				block_output.push(await compile(node.consequent, input_data, input_methods, compile_options));
-			}
-		} else {
-			if (node.alternate) {
-				block_output.push(await compile(node.alternate, input_data, input_methods, compile_options));
-			}
+		if (node.trim) {
+			return return_trimmed_value(value);
 		}
 
-		return block_output.join('');
-	}
-
-	async function compile_block_for(node: Node): Promise<string> {
-		const block_context: any = {};
-		const block_output: string[] = [];
-		const loop_iterator = await compile_node(node.iterator);
-		const iterator_type = return_type(loop_iterator);
-
-		if (iterator_type === 'object') {
-			const [for_key, for_value] = node.variables;
-
-			for (const [loop_index, loop_key] of Object.keys(loop_iterator).entries()) {
-				const block_data = { ...input_data };
-
-				if (for_value) {
-					block_data[for_key] = loop_key;
-					block_data[for_value] = loop_iterator[loop_key];
-				} else {
-					block_data[for_key] = loop_iterator[loop_key];
-				}
-
-				block_output.push(await compile(node.body, block_data, input_methods, compile_options));
-			}
-		} else if (iterator_type === 'array') {
-			const [for_variable, for_index] = node.variables;
-
-			for (const [loop_index, loop_data] of loop_iterator.entries()) {
-				const block_data = { ...input_data };
-
-				block_data[for_variable] = loop_data;
-
-				if (for_index) {
-					block_data[for_index] = loop_index;
-				}
-
-				block_output.push(await compile(node.body, block_data, input_methods, compile_options));
-			}
-		} else {
-			throw new NanoError(
-				`Variable "${node.iterator.properties[node.iterator.properties.length - 1]}" is not iterable`
-			);
+		if (node.escape) {
+			return return_escaped_value(value);
 		}
 
-		return block_output.join('');
+		return value;
 	}
 
-	async function compile_tag_comment(node: Node): Promise<string> {
-		return compile_options.display_comments ? `<!-- ${node.value} -->` : '';
-	}
-
-	async function compile_tag_import(node: Node): Promise<string> {
-		const import_path_dir = compile_options.import_directory || default_options.import_directory || '';
-		const import_file_path = join_path(import_path_dir, node.path);
+	async function ImportStatement(node) {
+		const import_path = await render_node(node.path);
 
 		try {
-			const import_file = await Deno.readTextFile(import_file_path);
-			const import_data = node.variables ? await compile_scoped_variables(node.variables) : input_data;
+			const import_filepath = is_path_absolute(import_path) ? import_path : join_path(input_settings.import_directory, import_path);
 
-			async function compile_scoped_variables(variables: Record<string, Node>) {
-				const scoped_variables: Record<string, any> = {};
+			//@ts-ignore
+			const import_file = await Deno.readTextFile(import_filepath);
+			const import_data = { ...input_data };
+			const import_settings = { ...input_settings };
 
-				for (const key of Object.keys(variables)) {
-					scoped_variables[key] = await compile_node(variables[key]);
-				}
+			const imported_template = Parse(import_file);
 
-				return scoped_variables;
+			for (const subnode of imported_template) {
+				subnode.trim = node.trim && subnode.type === "Text";
+				subnode.escape = node.escape && subnode.type === "Text";
 			}
 
-			return compile(parse(scan(import_file)), import_data, input_methods, compile_options);
+			for (const pair of node.with) {
+				const key = pair.key;
+				const value = await render_node(pair.value);
+
+				import_data[key] = value;
+			}
+
+			return RenderTemplate(imported_template, import_data, import_settings);
 		} catch (error) {
-			throw new NanoError(`Imported file does not exist: ${import_file_path}`);
+			throw new Error(`Imported file "${import_path}" does not exist.`);
 		}
 	}
 
-	async function compile_node(node: Node): Promise<any> {
-		if (node.type === NODE_TYPES[0]) {
-			return compile_value_text(node);
-		}
+	async function IfStatement(node) {
+		const test = await render_node(node.test);
 
-		if (node.type === NODE_TYPES[1]) {
-			return compile_value_variable(node);
-		}
-
-		if (node.type === NODE_TYPES[2]) {
-			return compile_expression_filter(node);
-		}
-
-		if (node.type === NODE_TYPES[3]) {
-			return compile_expression_conditional(node);
-		}
-
-		if (node.type === NODE_TYPES[4]) {
-			return compile_expression_logical(node);
-		}
-
-		if (node.type === NODE_TYPES[5]) {
-			return compile_expression_unary(node);
-		}
-
-		if (node.type === NODE_TYPES[6]) {
-			return compile_expression_binary(node);
-		}
-
-		if (node.type === NODE_TYPES[7]) {
-			return compile_block_if(node);
-		}
-
-		if (node.type === NODE_TYPES[8]) {
-			return compile_block_for(node);
-		}
-
-		if (node.type === NODE_TYPES[9]) {
-			return compile_tag_comment(node);
-		}
-
-		if (node.type === NODE_TYPES[10]) {
-			return compile_tag_import(node);
+		if (test) {
+			return RenderTemplate(node.body, input_data, input_settings);
+		} else {
+			if (node.alternate) {
+				return RenderTemplate(node.alternate, input_data, input_settings);
+			}
 		}
 	}
 
-	for (const node of nodes) {
-		output.push(await compile_node(node));
+	async function ForStatement(node) {
+		const iterator_value = await render_node(node.iterator);
+		const iterator_type = return_type(iterator_value);
+
+		let iterator: any = null;
+		let iterator_output: string = '';
+
+		switch (iterator_type) {
+			case 'object':
+				iterator = Object.keys(iterator_value).map(k => [k, iterator_value[k]]);
+				break;
+			case 'array':
+				iterator = iterator_value.map((v, i) => [v, i]);
+				break;
+			case 'string':
+				iterator = iterator_value.split('').map((v, i) => [v, i]);
+				break;
+			case 'number':
+				iterator = Array.from({ length: iterator_value }).map((v, i) => [i + 1, i]);
+				break;
+		}
+
+		const [iterator_index_key_name, iterator_value_name] = node.variables;
+
+		for (const [loop_index_key, loop_value] of iterator) {
+			const block_input_data = { ...input_data };
+			const block_input_settings = { ...input_settings };
+
+			block_input_data[iterator_index_key_name] = loop_index_key;
+			block_input_data[iterator_value_name] = loop_value;
+
+			iterator_output += await RenderTemplate(node.body, block_input_data, block_input_settings);
+		}
+
+		return iterator_output;
 	}
 
-	return output.join('');
+	async function FunctionCall(node) {
+		const function_name = await render_node(node.function);
+		const argument_list = await render_nodes(node.arguments);
+
+		if (!function_name) {
+			return undefined;
+		}
+
+		return function_name(...argument_list);
+	}
+
+	async function VariableCall(node) {
+		const variable = await render_node(node.variable);
+		const property = await render_node(node.property);
+
+		if (!variable) {
+			return undefined;
+		}
+
+		return variable[property];
+	}
+
+	async function LogicalExpression(node) {
+		const operator = node.operator;
+		const left = await render_node(node.left);
+		const right = await render_node(node.right);
+
+		switch (node.operator) {
+			case '&&':
+				return left && right;
+			case '||':
+				return left || right;
+		}
+	}
+
+	async function BinaryExpression(node) {
+		const operator = node.operator;
+		const left = await render_node(node.left);
+		const right = await render_node(node.right);
+
+		switch (node.operator) {
+			case '!=':
+				return left != right;
+			case '==':
+				return left == right;
+			case '<=':
+				return left <= right;
+			case '>=':
+				return left >= right;
+			case '<':
+				return left < right;
+			case '>':
+				return left > right;
+			case '+':
+				return left + right;
+			case '-':
+				return left - right;
+			case '*':
+				return left * right;
+			case '/':
+				return left / right;
+		}
+	}
+
+	async function TernaryExpression(node) {
+		const test = await render_node(node.test);
+
+		if (test) {
+			return render_node(node.consequent);
+		} else {
+			return render_node(node.alternate);
+		}
+	}
+
+	async function UnaryExpression(node) {
+		const value = await render_node(node.value);
+
+		switch (node.operator) {
+			case '!':
+				return !value;
+			case '-':
+				return -value;
+		}
+	}
+
+	async function Identifier(node) {
+		return input_data[node.value];
+	}
+
+	async function Literal(node) {
+		return node.value;
+	}
+
+	async function render_nodes(node_list) {
+		const rendered_nodes: Array<any> = [];
+
+		for (const node of node_list) {
+			rendered_nodes.push(await render_node(node));
+		}
+
+		return rendered_nodes;
+	}
+
+	async function render_node(node) {
+		switch (node.type) {
+			case 'Text':
+				return Text(node);
+			case 'Tag':
+				return Tag(node);
+			case 'ImportStatement':
+				return ImportStatement(node);
+			case 'IfStatement':
+				return IfStatement(node);
+			case 'ForStatement':
+				return ForStatement(node);
+			case 'FunctionCall':
+				return FunctionCall(node);
+			case 'VariableCall':
+				return VariableCall(node);
+			case 'LogicalExpression':
+				return LogicalExpression(node);
+			case 'BinaryExpression':
+				return BinaryExpression(node);
+			case 'TernaryExpression':
+				return TernaryExpression(node);
+			case 'UnaryExpression':
+				return UnaryExpression(node);
+			case 'Identifier':
+				return Identifier(node);
+			case 'StringLiteral':
+			case 'NumericLiteral':
+			case 'TrueLiteral':
+			case 'FalseLiteral':
+			case 'NullLiteral':
+				return Literal(node);
+		}
+	}
+
+	function return_type(value) {
+		return Object.prototype.toString.call(value).slice(8, -1).toLowerCase();
+	}
+
+	function return_trimmed_value(value: string) {
+		return value.replace(/\>\s+\</g, '><').replace(/\t|\n/g, '');
+	}
+
+	function return_escaped_value(value: string) {
+		const character_map: Record<string, string> = {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;',
+			"'": '&#39;',
+			'`': '&#x60;',
+			'=': '&#x3D;',
+			'/': '&#x2F;',
+		};
+
+		return value.replace(/[&<>"'`=\/]/g, (match: string) => character_map[match]);
+	}
+
+	const rendered_nodes = await render_nodes(parsed_template);
+	return rendered_nodes.join('');
 }
 
-export async function render(input: string, input_data: NanoInputData = {}, input_methods: NanoInputMethods = {}, input_options?: NanoOptions) {
-	return compile(parse(scan(input)), input_data, input_methods, input_options);
+type InputTemplate = string;
+type InputData = Record<string, any>;
+type InputSettings = {
+	import_directory: string;
+};
+
+export default async function render(
+	input_template: InputTemplate,
+	input_data: InputData = {},
+	input_settings: InputSettings = { import_directory: '' }
+) {
+	return RenderTemplate(Parse(input_template), input_data, input_settings);
 }
