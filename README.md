@@ -29,6 +29,12 @@ _Result_
 <div>{ my_variable }</div>
 ```
 ```html
+<div>{ nested.property }</div>
+```
+```html
+<div>{ nested['bracket']['notation'] }</div>
+```
+```html
 <div>{ 2 + 2 }</div>
 ```
 ```html
@@ -36,6 +42,9 @@ _Result_
 ```
 ```html
 <div>{ example_function(my_variable) }</div>
+```
+```html
+<div>{ nested.function(other.variable) }</div>
 ```
 ```html
 <div>{ nested(function(1, true, "foo", my_variable)) }</div>
