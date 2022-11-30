@@ -1,9 +1,8 @@
 ## Nano
-
 Nano is a template engine initially made for use with Deno Deploy where `eval()` is blocked for security reasons.
 
-### Usage
 ---
+### Usage
 As with any template processor, the output is rendered by combining a string template and a data object.
 ```js
 import render from 'https://deno.land/x/nano/mod.ts';
@@ -23,8 +22,8 @@ _Result_
 <div>Hello!!!!</div>
 ```
 
-### Syntax
 ---
+### Syntax
 #### Expressions
 ```html
 <div>{ my_variable }</div>
@@ -96,8 +95,8 @@ Therefore it's also possible to define/rewrite variables using the `with` keywor
 <li>{fruit} no. {number}</li>
 ```
 
-### Other features
 ---
+### Other features
 #### Remove whitespace `{!...}`
 By adding a `!` character at the beginning of a tag the renderer will remove all whitespace around  HTML tags. In this example (with whitespace added for clarity),
 
@@ -126,7 +125,6 @@ will output
 ```html
 <span>1</span><span>2</span><span>3</span><span>4</span>
 ```
-
 
 #### Escape HTML `{#...}`
 Tags can be marked with a `#` in the same fashion, which will escape reserved HTML characters.
