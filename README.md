@@ -1,7 +1,9 @@
 ## Nano
+
 Nano is a template engine initially made for use with Deno Deploy where `eval()` is blocked for security reasons.
 
 ### Usage
+---
 As with any template processor, the output is rendered by combining a string template and a data object.
 ```js
 import render from 'https://deno.land/x/nano/mod.ts';
@@ -22,6 +24,7 @@ _Result_
 ```
 
 ### Syntax
+---
 #### Expressions
 ```html
 <div>{ my_variable }</div>
@@ -68,7 +71,34 @@ _Result_
 {/for}
 ```
 
-#### Remove whitespace
+#### Imports
+```html
+{ import 'subfolder/other_file.html' }
+```
+The imported module will have access to the same data accessible to the file it's being imported from:
+```html
+<!-- list.html -->
+{for fruit in fruits}
+  { import 'list_item.html' }
+{/for}
+
+<!-- list_item.html -->
+<li>{fruit}</li>
+```
+Therefore it's also possible to define/rewrite variables using the `with` keyword along with a list of `(key: value, key: value)` pairs
+```html
+<!-- list.html -->
+{for fruit, index in fruits}
+  { import 'list_item.html' with (number: index + 1, other: "thing") }
+{/for}
+
+<!-- list_item.html -->
+<li>{fruit} no. {number}</li>
+```
+
+### Other features
+---
+#### Remove whitespace `{!...}`
 By adding a `!` character at the beginning of a tag the renderer will remove all whitespace around  HTML tags. In this example (with whitespace added for clarity),
 
 the following `{for}`
@@ -98,43 +128,18 @@ will output
 ```
 
 
-#### Escape characters
-Tags can be marked with a `#` in the same fashion, which will escape the output.
+#### Escape HTML `{#...}`
+Tags can be marked with a `#` in the same fashion, which will escape reserved HTML characters.
 In this example, for a variable named `code` with the value
 
 ```js
 '<script>/* test */</script>'
 ```
-the following `{code}` will output
+the tag `{code}` will output
 ```
 <script>/* test */</script>
 ```
 however `{#code}` will output
 ```html
 &lt;script&gt;&#x2F;* test *&#x2F;&lt;&#x2F;script&gt;
-```
-
-#### Imports
-```html
-{ import 'subfolder/other_file.html' }
-```
-The imported module will have access to the same data accessible to the file it's being imported from:
-```html
-<!-- list.html -->
-{for fruit in fruits}
-  { import 'list_item.html' }
-{/for}
-
-<!-- list_item.html -->
-<li>{fruit}</li>
-```
-Therefore it's also possible to define/rewrite variables using the `with` keyword along with a list of `(key: value, key: value)` pairs
-```html
-<!-- list.html -->
-{for fruit, index in fruits}
-  { import 'list_item.html' with (number: index + 1, other: "thing") }
-{/for}
-
-<!-- list_item.html -->
-<li>{fruit} no. {number}</li>
 ```
