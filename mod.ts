@@ -828,7 +828,11 @@ export async function RenderTemplate(parsed_template: any, input_data: InputData
 
 			return RenderTemplate(imported_template, import_data, import_settings);
 		} catch (error) {
-			throw new Error(`Imported file "${import_path}" does not exist.`);
+			if (error.name === 'NotFound') {
+				throw new Error(`Imported file "${import_path}" could not be found.`);
+			}
+
+			throw error;
 		}
 	}
 
