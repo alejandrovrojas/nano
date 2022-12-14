@@ -4,7 +4,6 @@
  * 	NANO – eval-free template engine
  *
  * 	should have
- * 
  * 		[] keep track of indentation for debugging/error messages
  * 	could have
  * 		[] proper type definitions for nodes/tokens zZzZzzZzz...
