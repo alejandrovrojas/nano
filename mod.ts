@@ -803,18 +803,17 @@ export async function RenderTemplate(parsed_template: any, input_data: InputData
 
 	async function ImportStatement(node) {
 		const import_path = await render_node(node.path);
+		const import_path_prefixed = is_path_absolute(import_path) ? import_path : join_path(input_settings.import_directory, import_path);
 
 		try {
-			const import_filepath = is_path_absolute(import_path) ? import_path : join_path(input_settings.import_directory, import_path);
-
 			//@ts-ignore
-			const import_file = await Deno.readTextFile(import_filepath);
+			const imported_file = await Deno.readTextFile(import_path_prefixed);
+			const imported_file_parsed = Parse(imported_file);
+
 			const import_data = { ...input_data };
 			const import_settings = { ...input_settings };
 
-			const imported_template = Parse(import_file);
-
-			for (const subnode of imported_template) {
+			for (const subnode of imported_file_parsed) {
 				subnode.trim = node.trim && subnode.type === "Text";
 				subnode.escape = node.escape && subnode.type === "Text";
 			}
@@ -826,7 +825,7 @@ export async function RenderTemplate(parsed_template: any, input_data: InputData
 				import_data[key] = value;
 			}
 
-			return RenderTemplate(imported_template, import_data, import_settings);
+			return RenderTemplate(imported_file_parsed, import_data, import_settings);
 		} catch (error) {
 			if (error.name === 'NotFound') {
 				throw new Error(`Imported file "${import_path}" could not be found.`);
