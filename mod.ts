@@ -807,7 +807,7 @@ export async function RenderTemplate(parsed_template: any, input_data: InputData
 
 		try {
 			//@ts-ignore
-			const imported_file = await Deno.readTextFile(import_path_prefixed);
+			const imported_file = input_data[import_path] || await Deno.readTextFile(import_path_prefixed);
 			const imported_file_parsed = Parse(imported_file);
 
 			const import_data = { ...input_data };
