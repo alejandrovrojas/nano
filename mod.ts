@@ -108,7 +108,7 @@ export function Parse(input_template: string) {
 
 export function ParseTemplate(input_template: string) {
 	const tokens: Array<any> = [];
-	const split_rule = /(<!--[^]*?-->|<style.*>[^]*?<\/style>|<script.*>[^]*?<\/script>|\{[^]*?\})/;
+	const split_rule = /(<!--[^]*?-->|<style[\s\S]*?>[\s\S]*?<\/style>|<script[\s\S]*?>[\s\S]*?<\/script>|\{[^]*?\})/;
 	const split_template = input_template.split(split_rule);
 
 	let line = 1;
