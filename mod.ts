@@ -118,10 +118,6 @@ export function ParseTemplate(input_template: string) {
 		let value = split_template[index];
 		let current_type = 'Text';
 
-		if (value.startsWith('<!--')) {
-			current_type = 'Comment';
-		}
-
 		if (value.startsWith('{#')) {
 			current_type = 'EscapedTag';
 			value = value.slice(2, -1);
