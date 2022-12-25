@@ -5,6 +5,7 @@
  *
  * 	should have
  * 		[] keep track of indentation for debugging/error messages
+ * 		[] log a warning if variable calls return undefined?
  * 	could have
  * 		[] proper type definitions for nodes/tokens zZzZzzZzz...
  * 	won't have
