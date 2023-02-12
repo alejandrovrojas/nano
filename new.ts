@@ -211,8 +211,10 @@ function ParseTemplate(input_template: string) {
 			const next_type = tokenizer.next().type;
 			const next_node = Node(next_type);
 
-			if (next_type === 'ELSE' || next_type === 'ELSEIF') {
-				alternate = next_node as NodeIf | NodeElse;
+			if (next_type === 'ELSEIF') {
+				alternate = next_node as NodeIf;
+			} else if (next_type === 'ELSE') {
+				alternate = next_node as NodeElse;
 			} else {
 				consequent.push(next_node);
 			}
