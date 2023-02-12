@@ -17,7 +17,7 @@ import { join as join_path, isAbsolute as is_path_absolute } from 'https://deno.
 
 type TokenSpec = Array<[RegExp, string | null]>;
 
-function Tokenizer(input: string, token_spec: TokenSpec, line_offset = 1) {
+function Tokenizer(input: string, token_spec: TokenSpec) {
 	let cursor = 0;
 	let line = line_offset;
 	let lookahead_token = get_next_token();
@@ -292,7 +292,7 @@ export function ParseExpression(input_expression: string, line_offset: number) {
 		tokenizer.advance_token('FOR');
 
 		/**
-		 * 	@TODO: throw if variables.length > 2.
+		 * @TODO throw if variables.length > 2.
 		 * */
 		const variables = IdentifierList();
 
@@ -638,7 +638,7 @@ export function StructureTemplate(node_list): any[] {
 					value: node.value,
 					line,
 					trim: inside_trim_block,
-					escape: inside_escape_block
+					escape: inside_escape_block,
 				});
 				break;
 
@@ -658,7 +658,7 @@ export function StructureTemplate(node_list): any[] {
 							alternate: null,
 							line,
 							trim: trimmed_tag,
-							escape: escaped_tag
+							escape: escaped_tag,
 						});
 						break;
 
@@ -670,7 +670,7 @@ export function StructureTemplate(node_list): any[] {
 							body: [],
 							line,
 							trim: trimmed_tag,
-							escape: escaped_tag
+							escape: escaped_tag,
 						});
 						break;
 
@@ -682,7 +682,7 @@ export function StructureTemplate(node_list): any[] {
 							alternate: null,
 							line,
 							trim: trimmed_tag,
-							escape: escaped_tag
+							escape: escaped_tag,
 						});
 						break;
 
@@ -692,7 +692,7 @@ export function StructureTemplate(node_list): any[] {
 							body: [],
 							line,
 							trim: trimmed_tag,
-							escape: escaped_tag
+							escape: escaped_tag,
 						});
 						break;
 
@@ -702,7 +702,7 @@ export function StructureTemplate(node_list): any[] {
 							path: parsed_expression.path,
 							with: parsed_expression.with,
 							trim: trimmed_tag,
-							escape: escaped_tag
+							escape: escaped_tag,
 						});
 						break;
 
@@ -712,7 +712,7 @@ export function StructureTemplate(node_list): any[] {
 							value: parsed_expression,
 							line,
 							trim: trimmed_tag,
-							escape: escaped_tag
+							escape: escaped_tag,
 						});
 				}
 				break;
@@ -800,19 +800,21 @@ export async function RenderTemplate(parsed_template: any, input_data: InputData
 
 	async function ImportStatement(node) {
 		const import_path = await render_node(node.path);
-		const import_path_prefixed = is_path_absolute(import_path) ? import_path : join_path(input_settings.import_directory, import_path);
+		const import_path_prefixed = is_path_absolute(import_path)
+			? import_path
+			: join_path(input_settings.import_directory, import_path);
 
 		try {
 			//@ts-ignore
-			const imported_file = input_data[import_path] || await Deno.readTextFile(import_path_prefixed);
+			const imported_file = input_data[import_path] || (await Deno.readTextFile(import_path_prefixed));
 			const imported_file_parsed = Parse(imported_file);
 
 			const import_data = { ...input_data };
 			const import_settings = { ...input_settings };
 
 			for (const subnode of imported_file_parsed) {
-				subnode.trim = node.trim && subnode.type === "Text";
-				subnode.escape = node.escape && subnode.type === "Text";
+				subnode.trim = node.trim && subnode.type === 'Text';
+				subnode.escape = node.escape && subnode.type === 'Text';
 			}
 
 			for (const pair of node.with) {
@@ -847,6 +849,10 @@ export async function RenderTemplate(parsed_template: any, input_data: InputData
 	async function ForStatement(node) {
 		const iterator_value = await render_node(node.iterator);
 		const iterator_type = return_type(iterator_value);
+
+		/**
+		 * @TODO throw if iterator_value is falsy?
+		 * */
 
 		let iterator: any = null;
 		let iterator_output: string = '';
