@@ -218,8 +218,8 @@ function ParseTemplate(input_template: string) {
 	}
 
 	function For(): NodeFor {
-		const tag_string = tokenizer.advance('FOR').value;
-		const expression_string = tag_string.slice(1, -1);
+		const token = tokenizer.advance('FOR');
+		const expression_string = token.value.slice(1, -1);
 		const expression_parsed = expression_string;
 		const value = NodeList('FOR_END');
 
@@ -234,8 +234,8 @@ function ParseTemplate(input_template: string) {
 	}
 
 	function If(token_type: 'IF' | 'ELSEIF' = 'IF'): NodeIf {
-		const tag_string = tokenizer.advance(token_type).value;
-		const expression_string = token_type === 'IF' ? tag_string.slice(1, -1) : tag_string.slice(6, -1);
+		const token = tokenizer.advance(token_type);
+		const expression_string = token.value.slice(1, -1);
 		const expression_parsed = expression_string;
 
 		let consequent: NodeTypeList = [];
@@ -293,10 +293,11 @@ function ParseTemplate(input_template: string) {
 
 	function Tag(): NodeTag {
 		const token = tokenizer.advance('TAG');
+		const expression_string = token.value.slice(1, -1);
 
 		return {
 			type: 'Tag',
-			value: token.value.slice(1, -1),
+			value: expression_string,
 		};
 	}
 
