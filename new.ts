@@ -102,7 +102,7 @@ function Tokenizer(input: string, token_spec: TokenSpec) {
 
 	function traverse_and_set_token(token_type_match: string) {
 		if (next_token === null) {
-			throw new NanoError(`Unexpected end of input (line ${line})`);
+			throw new NanoError(`Unexpected end of input (line ${line + 1})`);
 		}
 
 		if (next_token.type !== token_type_match) {
@@ -206,7 +206,7 @@ function ParseTemplate(input_template: string) {
 	}
 
 	function Noop(token_type) {
-		return tokenizer.advance('');
+		return tokenizer.advance();
 	}
 
 	function NodeList(token_type_limit: undefined | string = undefined): NodeTypeList {
