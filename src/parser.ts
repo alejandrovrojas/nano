@@ -1,37 +1,17 @@
-import type { Token, TokenSpec } from './types.ts';
+import type {
+	Token,
+	TokenSpec,
+	NodeType,
+	NodeTypeList,
+	NodeIf,
+	NodeElse,
+	NodeFor,
+	NodeTag,
+	NodeText,
+	Root,
+} from './types.ts';
+
 import { Tokenizer } from './tokenizer.ts';
-
-type NodeType = NodeIf | NodeElse | NodeFor | NodeTag | NodeText;
-type NodeTypeList = NodeType[];
-
-type NodeIf = {
-	type: 'If';
-	test: any;
-	consequent: NodeTypeList;
-	alternate: NodeIf | NodeElse | null;
-};
-
-type NodeElse = {
-	type: 'Else';
-	value: NodeTypeList;
-};
-
-type NodeFor = {
-	type: 'For';
-	variables: any;
-	iterator: any;
-	value: NodeTypeList;
-};
-
-type NodeTag = {
-	type: 'Tag';
-	value: string;
-};
-
-type NodeText = {
-	type: 'Text';
-	value: string;
-};
 
 function ParseExpression(input_expression: string) {
 	const expression_tokens: TokenSpec = [
@@ -236,7 +216,7 @@ function ParseTemplate(input_template: string) {
 		return null;
 	}
 
-	function Root() {
+	function Root(): Root {
 		return {
 			type: 'Root',
 			value: NodeList(),
