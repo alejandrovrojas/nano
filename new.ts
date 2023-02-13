@@ -1,54 +1,12 @@
-const INPUT = `{if thing}AAA{else if otherthing}BBB{else}CCC{/if}`;
-
-const spec_expressions: TokenSpec = [
-	[/^\s+/, null],
-	[/^\/\/.*/, null],
-	[/^\/\*[\s\S]*?\*\//, null],
-
-	[/^\(/, 'L_PARENTHESIS'],
-	[/^\)/, 'R_PARENTHESIS'],
-	[/^\[/, 'L_BRACKET'],
-	[/^\]/, 'R_BRACKET'],
-	[/^\{/, 'L_CURLY'],
-	[/^\}/, 'R_CURLY'],
-	[/^\,/, 'COMMA'],
-	[/^\./, 'DOT'],
-
-	[/^\bimport\b/, 'IMPORT'],
-	[/^\bwith\b/, 'WITH'],
-	[/^\bfor\b/, 'FOR'],
-	[/^\bin\b/, 'IN'],
-	[/^\bif\b/, 'IF'],
-	[/^\belse\b/, 'ELSE'],
-	[/^\btrue\b/, 'TRUE'],
-	[/^\bfalse\b/, 'FALSE'],
-	[/^\bnull\b/, 'NULL'],
-
-	[/^[+\-]/, 'ADDITIVE'],
-	[/^[*\/]/, 'MULTIPLICATIVE'],
-
-	[/^[=!]=/, 'EQUALITY'],
-	[/^[><]=?/, 'RELATIONAL'],
-	[/^&&/, 'AND'],
-	[/^\|\|/, 'OR'],
-	[/^!/, 'NOT'],
-
-	[/^\d+(\.\d+)?/, 'NUMBER'],
-	[/^[A-Za-z0-9_$ß]+/, 'IDENTIFIER'],
-
-	[/^\?/, 'QUESTIONMARK'],
-	[/^\:/, 'COLON'],
-
-	[/^"[^"]*"/, 'STRING'],
-	[/^'[^']*'/, 'STRING'],
-];
+type TokenSpec = Array<[RegExp, string | null]>;
 
 type Token = {
 	type: string;
 	value: string;
 };
 
-type TokenSpec = Array<[RegExp, string | null]>;
+type NodeType = NodeFor | NodeIf | NodeElse | NodeTag | NodeText;
+type NodeTypeList = NodeType[];
 
 type NodeFor = {
 	type: 'For';
@@ -69,20 +27,22 @@ type NodeElse = {
 	value: NodeTypeList;
 };
 
-type NodeText = {
-	type: 'Text';
-	value: string;
-};
-
 type NodeTag = {
 	type: 'Tag';
 	value: string;
 };
 
-type NodeTypeList = NodeType[];
-type NodeType = NodeIf | NodeElse | NodeText | NodeTag;
+type NodeText = {
+	type: 'Text';
+	value: string;
+};
+
+class NanoError extends SyntaxError {
+	public name = 'NanoSyntaxError';
+}
 
 function Tokenizer(input: string, token_spec: TokenSpec) {
+	let line = 0;
 	let cursor = 0;
 	let next_token: Token = traverse_next_token();
 
@@ -146,31 +106,74 @@ function Tokenizer(input: string, token_spec: TokenSpec) {
 	}
 
 	return {
+		line: return_current_line,
 		next: return_next_token,
-		advance: advance_and_return_token,
+		advance: traverse_and_set_token,
 	};
 }
 
-function ParseTemplate(input_template: string) {
-	const spec_template: TokenSpec = [
-		[/^<!--[\s\S]*?-->/, 'COMMENT'],
+function ParseExpression(input_expression: string) {
+	const expression_tokens: TokenSpec = [
+		[/^\s+/, null],
+		[/^<!--[\s\S]*?-->/, null],
 
-		[/^<style[\s\S]*?>[\s\S]*?<\/style>/, 'HTML_STYLE'],
-		[/^<script[\s\S]*?>[\s\S]*?<\/script>/, 'HTML_SCRIPT'],
+		[/^\(/, 'L_PARENTHESIS'],
+		[/^\)/, 'R_PARENTHESIS'],
+		[/^\[/, 'L_BRACKET'],
+		[/^\]/, 'R_BRACKET'],
+		[/^\{/, 'L_CURLY'],
+		[/^\}/, 'R_CURLY'],
+		[/^\,/, 'COMMA'],
+		[/^\./, 'DOT'],
+
+		[/^\bimport\b/, 'IMPORT'],
+		[/^\bwith\b/, 'WITH'],
+		[/^\bfor\b/, 'FOR'],
+		[/^\bin\b/, 'IN'],
+		[/^\bif\b/, 'IF'],
+		[/^\belse\b/, 'ELSE'],
+		[/^\btrue\b/, 'TRUE'],
+		[/^\bfalse\b/, 'FALSE'],
+		[/^\bnull\b/, 'NULL'],
+
+		[/^[+\-]/, 'ADDITIVE'],
+		[/^[*\/]/, 'MULTIPLICATIVE'],
+
+		[/^[=!]=/, 'EQUALITY'],
+		[/^[><]=?/, 'RELATIONAL'],
+		[/^&&/, 'AND'],
+		[/^\|\|/, 'OR'],
+		[/^!/, 'NOT'],
+
+		[/^\d+(\.\d+)?/, 'NUMBER'],
+		[/^[A-Za-z0-9_$ß]+/, 'IDENTIFIER'],
+
+		[/^\?/, 'QUESTIONMARK'],
+		[/^\:/, 'COLON'],
+
+		[/^"[^"]*"/, 'STRING'],
+		[/^'[^']*'/, 'STRING'],
+	];
+	const tokenizer = Tokenizer(input_expression, expression_tokens);
+}
+
+function ParseTemplate(input_template: string) {
+	const template_tokens: TokenSpec = [
+		[/^<!--[\s\S]*?-->/, null],
+		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
 		[/^{if [\s\S]*?}/, 'IF'],
 		[/^{else if [\s\S]*?}/, 'ELSEIF'],
 		[/^{else}/, 'ELSE'],
 		[/^{\/if}/, 'IF_END'],
 
-		// [/^{for [\s\S]*?}/, 'FOR'],
-		// [/^{\/for}/, 'FOR_END'],
+		[/^{for [\s\S]*?}/, 'FOR'],
+		[/^{\/for}/, 'FOR_END'],
 
 		[/^{[\s\S]*?}/, 'TAG'],
-		[/^[\s\S]?/, 'ANY'],
+		[/^[\s\S]?/, 'TEXT'],
 	];
-
-	const tokenizer = Tokenizer(input_template, spec_template);
+	const tokenizer = Tokenizer(input_template, template_tokens);
 
 	function Node(token_type: any): NodeType {
 		switch (token_type) {
@@ -278,4 +281,14 @@ function ParseTemplate(input_template: string) {
 	return Root();
 }
 
-console.dir(ParseTemplate(INPUT), { depth: 100 });
+try {
+	console.dir(
+		ParseTemplate(`{ey bla}
+			BBBB
+			{if ble}
+		`),
+		{ depth: 100 }
+	);
+} catch (error) {
+	console.log(error);
+}
