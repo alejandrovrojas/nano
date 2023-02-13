@@ -193,17 +193,26 @@ function ParseTemplate(input_template: string) {
 				return ElseIf();
 			case 'ELSE':
 				return Else();
+			case 'FOR':
+				return For();
 			case 'TAG':
 				return Tag();
-			default:
+			case 'TEXT':
 				return Text();
+			case 'FOR_END':
+			case 'IF_END':
+				return Noop();
 		}
 	}
 
-	function NodeList(stop_at_type: undefined | string = undefined): NodeTypeList {
-		const node_list: NodeType[] = [];
+	function Noop(token_type) {
+		return tokenizer.advance('');
+	}
 
-		while (tokenizer.next() && tokenizer.next().type !== stop_at_type) {
+	function NodeList(token_type_limit: undefined | string = undefined): NodeTypeList {
+		const node_list: NodeTypeList = [];
+
+		while (tokenizer.next() && tokenizer.next().type !== token_type_limit) {
 			const next_type = tokenizer.next().type;
 			const next_node = Node(next_type);
 
@@ -213,9 +222,26 @@ function ParseTemplate(input_template: string) {
 		return node_list;
 	}
 
-	function If(if_type: 'IF' | 'ELSEIF' = 'IF'): NodeIf {
-		const block_tag = tokenizer.advance(if_type);
-		const test = block_tag.value;
+	function For(): NodeFor {
+		const tag_string = tokenizer.advance('FOR').value;
+		const expression_string = tag_string.slice(1, -1);
+		const expression_parsed = expression_string;
+		const value = NodeList('FOR_END');
+
+		tokenizer.advance('FOR_END');
+
+		return {
+			type: 'For',
+			variables: expression_string,
+			iterator: '',
+			value: value,
+		};
+	}
+
+	function If(token_type: 'IF' | 'ELSEIF' = 'IF'): NodeIf {
+		const tag_string = tokenizer.advance(token_type).value;
+		const expression_string = token_type === 'IF' ? tag_string.slice(1, -1) : tag_string.slice(6, -1);
+		const expression_parsed = expression_string;
 
 		let consequent: NodeTypeList = [];
 		let alternate: NodeIf | NodeElse | null = null;
@@ -229,17 +255,29 @@ function ParseTemplate(input_template: string) {
 			} else if (next_type === 'ELSE') {
 				alternate = next_node as NodeElse;
 			} else {
+				/**
+				 * @TODO handle flags
+				 * */
+
+				// if (next_type === 'TEXT') {
+				// 	next_node.flags = [true];
+				// }
+
 				consequent.push(next_node);
 			}
 		}
 
-		if (if_type === 'IF') {
+		// try {
+		if (token_type === 'IF') {
 			tokenizer.advance('IF_END');
 		}
+		// } catch (error) {
+		// 	throw new NanoError(`Missing {/if} closing tag (line ${tokenizer.line()})`);
+		// }
 
 		return {
 			type: 'If',
-			test: test,
+			test: expression_parsed,
 			consequent: consequent,
 			alternate: alternate,
 		};
@@ -258,26 +296,26 @@ function ParseTemplate(input_template: string) {
 		};
 	}
 
-	function Text(): NodeText {
-		const token = tokenizer.advance('ANY');
-		let token_value = token.value;
-
-		while (tokenizer.next() && tokenizer.next().type === 'ANY') {
-			token_value += tokenizer.advance('ANY').value;
-		}
-
-		return {
-			type: 'Text',
-			value: token_value,
-		};
-	}
-
 	function Tag(): NodeTag {
 		const token = tokenizer.advance('TAG');
 
 		return {
 			type: 'Tag',
-			value: token.value,
+			value: token.value.slice(1, -1),
+		};
+	}
+
+	function Text(): NodeText {
+		const token = tokenizer.advance('TEXT');
+		let token_value = token.value;
+
+		while (tokenizer.next() && tokenizer.next().type === 'TEXT') {
+			token_value += tokenizer.advance('TEXT').value;
+		}
+
+		return {
+			type: 'Text',
+			value: token_value,
 		};
 	}
 
