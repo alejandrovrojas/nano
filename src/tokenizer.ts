@@ -1,11 +1,12 @@
 import type { Token, TokenSpec } from './types.ts';
+import { NanoError } from './classes.ts';
 
 export function Tokenizer(input: string, token_spec: TokenSpec) {
 	let line = 0;
 	let cursor = 0;
-	let next_token: Token = traverse_next_token();
+	let next_token = traverse_next_token();
 
-	function traverse_next_token() {
+	function traverse_next_token(): Token | null {
 		if (!has_remaining_tokens()) {
 			return null;
 		}
@@ -59,7 +60,7 @@ export function Tokenizer(input: string, token_spec: TokenSpec) {
 		return cursor < input.length;
 	}
 
-	function traverse_and_set_token(token_type_match: string) {
+	function traverse_and_set_token(token_type_match: string | undefined = undefined) {
 		if (next_token === null) {
 			throw new NanoError(`Unexpected end of input (line ${line + 1})`);
 		}

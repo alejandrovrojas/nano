@@ -1,3 +1,4 @@
+import type { Token, TokenSpec } from './types.ts';
 import { Tokenizer } from './tokenizer.ts';
 
 type NodeType = NodeIf | NodeElse | NodeFor | NodeTag | NodeText;
@@ -31,10 +32,6 @@ type NodeText = {
 	type: 'Text';
 	value: string;
 };
-
-class NanoError extends SyntaxError {
-	public name = 'NanoSyntaxError';
-}
 
 function ParseExpression(input_expression: string) {
 	const expression_tokens: TokenSpec = [
@@ -100,7 +97,7 @@ function ParseTemplate(input_template: string) {
 
 	const tokenizer = Tokenizer(input_template, template_tokens);
 
-	function Node(token_type: any): NodeType {
+	function Node(token_type: any): NodeType | null {
 		switch (token_type) {
 			case 'IF':
 				return If();
@@ -122,11 +119,13 @@ function ParseTemplate(input_template: string) {
 	function NodeList(token_type_limit: undefined | string = undefined): NodeTypeList {
 		const node_list: NodeTypeList = [];
 
-		while (tokenizer.next() && tokenizer.next().type !== token_type_limit) {
-			const next_type = tokenizer.next().type;
+		while (tokenizer.next() && tokenizer.next()?.type !== token_type_limit) {
+			const next_type = tokenizer.next()?.type;
 			const next_node = Node(next_type);
 
-			node_list.push(next_node);
+			if (next_node) {
+				node_list.push(next_node);
+			}
 		}
 
 		return node_list;
@@ -156,24 +155,26 @@ function ParseTemplate(input_template: string) {
 		let consequent: NodeTypeList = [];
 		let alternate: NodeIf | NodeElse | null = null;
 
-		while (tokenizer.next() && tokenizer.next().type !== 'IF_END') {
-			const next_type = tokenizer.next().type;
+		while (tokenizer.next() && tokenizer.next()?.type !== 'IF_END') {
+			const next_type = tokenizer.next()?.type;
 			const next_node = Node(next_type);
 
-			if (next_type === 'ELSEIF') {
-				alternate = next_node as NodeIf;
-			} else if (next_type === 'ELSE') {
-				alternate = next_node as NodeElse;
-			} else {
-				/**
-				 * @TODO handle flags
-				 * */
+			if (next_node) {
+				if (next_type === 'ELSEIF') {
+					alternate = next_node as NodeIf;
+				} else if (next_type === 'ELSE') {
+					alternate = next_node as NodeElse;
+				} else {
+					/**
+					 * @TODO handle flags
+					 * */
 
-				// if (next_type === 'TEXT') {
-				// 	next_node.flags = [true];
-				// }
+					// if (next_type === 'TEXT') {
+					// 	next_node.flags = [true];
+					// }
 
-				consequent.push(next_node);
+					consequent.push(next_node);
+				}
 			}
 		}
 
@@ -220,7 +221,7 @@ function ParseTemplate(input_template: string) {
 		const token = tokenizer.advance('TEXT');
 		let token_value = token.value;
 
-		while (tokenizer.next() && tokenizer.next().type === 'TEXT') {
+		while (tokenizer.next() && tokenizer.next()?.type === 'TEXT') {
 			token_value += tokenizer.advance('TEXT').value;
 		}
 
@@ -230,8 +231,9 @@ function ParseTemplate(input_template: string) {
 		};
 	}
 
-	function Skip(token_type) {
-		return tokenizer.advance();
+	function Skip(): null {
+		tokenizer.advance();
+		return null;
 	}
 
 	function Root() {
