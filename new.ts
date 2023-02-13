@@ -60,6 +60,12 @@ function Tokenizer(input: string, token_spec: TokenSpec) {
 				continue;
 			}
 
+			const line_match = token_match.match(/\n/g);
+
+			if (line_match) {
+				line += line_match.length;
+			}
+
 			cursor += token_match.length;
 
 			if (token_type === null) {
@@ -74,7 +80,7 @@ function Tokenizer(input: string, token_spec: TokenSpec) {
 			return new_token;
 		}
 
-		throw new Error(`Unexpected token: ${current_input[0]}`);
+		throw new NanoError(`Unexpected token ${current_input[0]} (line ${line})`);
 	}
 
 	function return_token_match(token_regexp: RegExp, string_input: string) {
@@ -86,17 +92,21 @@ function Tokenizer(input: string, token_spec: TokenSpec) {
 		return next_token;
 	}
 
+	function return_current_line() {
+		return line;
+	}
+
 	function has_remaining_tokens() {
 		return cursor < input.length;
 	}
 
-	function advance_and_return_token(token_type_match: string) {
+	function traverse_and_set_token(token_type_match: string) {
 		if (next_token === null) {
-			throw new Error(`Unexpected end of input`);
+			throw new NanoError(`Unexpected end of input (line ${line})`);
 		}
 
 		if (next_token.type !== token_type_match) {
-			throw new Error(`Unexpected token: ${next_token.value}`);
+			throw new NanoError(`Unexpected token ${next_token.value} (line ${line + 1})`);
 		}
 
 		const current_token = next_token;
