@@ -1,6 +1,6 @@
 {
 	"tasks": {
-		"run": "deno run --allow-all new.ts",
+		"print": "deno run --allow-all tests/print.ts",
 		"test": "deno test --allow-all tests/test.ts"
 	}
 }
