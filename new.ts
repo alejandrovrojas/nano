@@ -199,14 +199,9 @@ function ParseTemplate(input_template: string) {
 				return Tag();
 			case 'TEXT':
 				return Text();
-			case 'FOR_END':
-			case 'IF_END':
-				return Noop();
+			default:
+				return Skip();
 		}
-	}
-
-	function Noop(token_type) {
-		return tokenizer.advance();
 	}
 
 	function NodeList(token_type_limit: undefined | string = undefined): NodeTypeList {
@@ -317,6 +312,10 @@ function ParseTemplate(input_template: string) {
 			type: 'Text',
 			value: token_value,
 		};
+	}
+
+	function Skip(token_type) {
+		return tokenizer.advance();
 	}
 
 	function Root() {
