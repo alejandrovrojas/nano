@@ -15,6 +15,13 @@ type NodeElse = {
 	value: NodeTypeList;
 };
 
+type NodeFor = {
+	type: 'For';
+	variables: any;
+	iterator: any;
+	value: NodeTypeList;
+};
+
 type NodeTag = {
 	type: 'Tag';
 	value: string;
