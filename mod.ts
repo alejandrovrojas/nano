@@ -210,12 +210,12 @@ export function ParseExpression(input_expression: string, line_offset: number) {
 		switch (tokenizer.lookahead().type) {
 			case 'IMPORT':
 				return ImportStatement();
-			case 'FOR':
-				return ForStatement();
 			case 'IF':
 				return IfStatement();
 			case 'ELSE':
 				return ElseStatement();
+			case 'FOR':
+				return ForStatement();
 			default:
 				return Expression();
 		}
