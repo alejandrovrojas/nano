@@ -16,7 +16,6 @@ import { Tokenizer } from './tokenizer.ts';
 type IdentifierList = NodeIdentifier[];
 type FunctionArgumentList = VariableExpression[];
 
-type ParenthesisExpression = Expression;
 type Expression = TernaryExpression;
 type TernaryExpression = NodeTernaryExpression | LogicalExpression;
 type LogicalExpression = NodeLogicalExpression | BinaryExpression;
@@ -27,7 +26,7 @@ type VariableExpression = FunctionCall | VariableCall;
 
 type FunctionCall = NodeFunctionCall | VariableCall;
 type VariableCall = NodeVariableCall | PrimaryExpression;
-type PrimaryExpression = ParenthesisExpression | NodeIdentifier | Literal;
+type PrimaryExpression = Expression | NodeIdentifier | Literal;
 
 type Literal = NodeBooleanLiteral | NodeNullLiteral | NodeStringLiteral | NodeNumericLiteral;
 
@@ -443,7 +442,7 @@ function ParseExpression(input_expression: string) {
 		}
 	}
 
-	function ParenthesisExpression(): ParenthesisExpression {
+	function ParenthesisExpression(): Expression {
 		tokenizer.advance('L_PARENTHESIS');
 		const expression = Expression();
 		tokenizer.advance('R_PARENTHESIS');
