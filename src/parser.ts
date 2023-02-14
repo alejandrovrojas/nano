@@ -8,7 +8,7 @@ import type {
 	NodeFor,
 	NodeTag,
 	NodeText,
-	Root,
+	RootTemplate,
 } from './types.ts';
 
 import { Tokenizer } from './tokenizer.ts';
@@ -55,7 +55,474 @@ function ParseExpression(input_expression: string) {
 		[/^"[^"]*"/, 'STRING'],
 		[/^'[^']*'/, 'STRING'],
 	];
+
 	const tokenizer = Tokenizer(input_expression, expression_tokens);
+
+	function RootExpression() {
+		switch (tokenizer.next()?.type) {
+			case 'IMPORT':
+				return ImportStatement();
+			case 'IF':
+				return IfStatement();
+			case 'ELSE':
+				return ElseStatement();
+			case 'FOR':
+				return ForStatement();
+			default:
+				return Expression();
+		}
+	}
+
+	function ImportStatement() {
+		tokenizer.advance('IMPORT');
+
+		const path_token = VariableExpression();
+		const key_value_pairs: Array<any> = [];
+
+		if (tokenizer.next() && tokenizer.next()?.type === 'WITH') {
+			tokenizer.advance('WITH');
+			tokenizer.advance('L_PARENTHESIS');
+
+			do {
+				const pair = KeyValuePair();
+				key_value_pairs.push(pair.value);
+			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
+
+			tokenizer.advance('R_PARENTHESIS');
+		}
+
+		return {
+			type: 'ImportStatement',
+			path: path_token,
+			with: key_value_pairs,
+		};
+	}
+
+	function KeyValuePair() {
+		const key = Identifier();
+		tokenizer.advance('COLON');
+		const value = VariableExpression();
+
+		return {
+			type: 'KeyValuePair',
+			value: {
+				key: key.value,
+				value,
+			},
+		};
+	}
+
+	function IfStatement() {
+		tokenizer.advance('IF');
+
+		const test = Expression();
+
+		return {
+			type: 'IfStatement',
+			test: test,
+		};
+	}
+
+	function ElseStatement() {
+		tokenizer.advance('ELSE');
+
+		if (tokenizer.next() && tokenizer.next()?.type === 'IF') {
+			const if_statement = IfStatement();
+
+			return {
+				type: 'ElseIfStatement',
+				test: if_statement.test,
+			};
+		}
+
+		return {
+			type: 'ElseStatement',
+		};
+	}
+
+	function ForStatement() {
+		tokenizer.advance('FOR');
+		const variables = IdentifierList();
+		tokenizer.advance('IN');
+		const iterator = VariableExpression();
+
+		/**
+		 * @TODO throw if variables.length > 2.
+		 * */
+
+		return {
+			type: 'ForStatement',
+			variables: variables.map((t: any) => t.value),
+			iterator,
+		};
+	}
+
+	function IdentifierList() {
+		const declarations: IdentifierList = [];
+
+		do {
+			declarations.push(Identifier());
+		} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
+
+		return declarations;
+	}
+
+	type IdentifierList = NodeIdentifier[];
+	type Expression = TernaryExpression | LogicalExpression;
+	type UnaryExpression = NodeUnaryExpression | VariableExpression;
+
+	type TernaryExpression = {
+		type: 'TernaryExpression';
+		test: LogicalExpression;
+		consequent: Expression;
+		alternate: Expression;
+	};
+
+	type LogicalExpression = {
+		type: 'LogicalExpression';
+		operator: string;
+		left: LogicalExpression | BinaryExpression;
+		right: LogicalExpression | BinaryExpression;
+	};
+
+	type BinaryExpression = {
+		type: 'LogicalExpression';
+		operator: string;
+		left: BinaryExpression | UnaryExpression;
+		right: BinaryExpression | UnaryExpression;
+	};
+
+	type NodeUnaryExpression = {
+		type: 'UnaryExpression';
+		operator: string;
+		value: UnaryExpression;
+	};
+
+	function Expression(): Expression {
+		return TernaryExpression();
+	}
+
+	function TernaryExpression(): TernaryExpression | LogicalExpression {
+		const left = OrExpression();
+
+		if (tokenizer.next() && tokenizer.next()?.type === 'QUESTIONMARK') {
+			tokenizer.advance('QUESTIONMARK');
+
+			const consequent = Expression();
+
+			tokenizer.advance('COLON');
+
+			const alternate = Expression();
+
+			return {
+				type: 'TernaryExpression',
+				test: left,
+				consequent,
+				alternate,
+			};
+		} else {
+			return left;
+		}
+	}
+
+	function BinaryExpression(expression_method: any, token_type: string): BinaryExpression {
+		let left = expression_method();
+
+		while (tokenizer.next() && tokenizer.next()?.type === token_type) {
+			const operator_token = tokenizer.advance(token_type);
+			const right = expression_method();
+
+			left = {
+				type: 'BinaryExpression',
+				operator: operator_token.value,
+				left,
+				right,
+			};
+		}
+
+		return left;
+	}
+
+	function LogicalExpression(expression_method: any, token_type: string): LogicalExpression {
+		let left = expression_method();
+
+		while (tokenizer.next() && tokenizer.next()?.type === token_type) {
+			const operator_token = tokenizer.advance(token_type);
+			const right = expression_method();
+
+			left = {
+				type: 'LogicalExpression',
+				operator: operator_token.value,
+				left,
+				right,
+			};
+		}
+
+		return left;
+	}
+
+	function OrExpression(): LogicalExpression {
+		return LogicalExpression(AndExpression, 'AND');
+	}
+
+	function AndExpression(): LogicalExpression {
+		return LogicalExpression(EqualityExpression, 'OR');
+	}
+
+	function EqualityExpression(): BinaryExpression {
+		return BinaryExpression(RelationalExpression, 'EQUALITY');
+	}
+
+	function RelationalExpression(): BinaryExpression {
+		return BinaryExpression(AddExpression, 'RELATIONAL');
+	}
+
+	function AddExpression(): BinaryExpression {
+		return BinaryExpression(MultiExpression, 'ADDITIVE');
+	}
+
+	function MultiExpression(): BinaryExpression {
+		return BinaryExpression(UnaryExpression, 'MULTIPLICATIVE');
+	}
+
+	function UnaryExpression(): UnaryExpression {
+		let unary_operator: Token | null = null;
+
+		if (tokenizer.next()) {
+			switch (tokenizer.next()?.type) {
+				case 'ADDITIVE':
+					unary_operator = tokenizer.advance('ADDITIVE');
+					break;
+
+				case 'NOT':
+					unary_operator = tokenizer.advance('NOT');
+					break;
+			}
+		}
+
+		if (unary_operator !== null) {
+			return {
+				type: 'UnaryExpression',
+				operator: unary_operator.value,
+				value: UnaryExpression(),
+			};
+		}
+
+		return VariableExpression();
+	}
+
+	type VariableExpression = VariableCall | FunctionCall;
+
+	function VariableExpression(): VariableExpression {
+		const variable_call = VariableCall();
+
+		if (tokenizer.next() && tokenizer.next()?.type === 'L_PARENTHESIS') {
+			return FunctionCall(variable_call);
+		}
+
+		return variable_call;
+	}
+
+	type VariableCall = NodeVariableCall | PrimaryExpression;
+
+	type NodeVariableCall = {
+		type: 'VariableCall';
+		variable: NodeVariableCall | PrimaryExpression;
+		property: StringLiteral | Expression;
+	};
+
+	function VariableCall(): VariableCall {
+		let variable: NodeVariableCall | PrimaryExpression = PrimaryExpression();
+
+		while (tokenizer.next() && (tokenizer.next()?.type === 'DOT' || tokenizer.next()?.type === 'L_BRACKET')) {
+			if (tokenizer.next()?.type === 'DOT') {
+				tokenizer.advance('DOT');
+
+				const property = Identifier();
+
+				variable = {
+					type: 'VariableCall',
+					variable,
+					property: {
+						type: 'StringLiteral',
+						value: property.value,
+					},
+				};
+			} else if (tokenizer.next()?.type === 'L_BRACKET') {
+				tokenizer.advance('L_BRACKET');
+
+				const property = Expression();
+
+				tokenizer.advance('R_BRACKET');
+
+				variable = {
+					type: 'VariableCall',
+					variable,
+					property,
+				};
+			}
+		}
+
+		return variable;
+	}
+
+	type NodeFunctionCall = {
+		type: 'FunctionCall';
+		function: Identifier | NodeVariableCall;
+		arguments: FunctionArguments;
+	};
+
+	function FunctionCall(recursive_call: NodeFunctionCall | NodeVariableCall | Identifier) {
+		let current_expression: NodeFunctionCall = {
+			type: 'FunctionCall',
+			function: recursive_call,
+			arguments: FunctionArguments(),
+		};
+
+		if (tokenizer.next() && tokenizer.next()?.type === 'L_PARENTHESIS') {
+			current_expression = FunctionCall(current_expression);
+		}
+
+		return current_expression;
+	}
+
+	type FunctionArguments = VariableExpression[];
+
+	function FunctionArguments(): FunctionArguments {
+		tokenizer.advance('L_PARENTHESIS');
+
+		const argument_list: FunctionArguments = [];
+		const is_inside_parenthesis = tokenizer.next() && tokenizer.next()?.type !== 'R_PARENTHESIS';
+
+		if (is_inside_parenthesis) {
+			do {
+				argument_list.push(VariableExpression());
+			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
+		}
+
+		tokenizer.advance('R_PARENTHESIS');
+
+		return argument_list;
+	}
+
+	type ParenthesisExpression = Expression;
+	type PrimaryExpression = Expression | NodeIdentifier | Literal | undefined;
+	type Literal = NodeBooleanLiteral | NodeNullLiteral | NodeStringLiteral | NodeNumericLiteral;
+
+	type NodeIdentifier = {
+		type: 'Identifier';
+		value: string;
+	};
+
+	type NodeBooleanLiteral = {
+		type: 'BooleanLiteral';
+		value: true | false;
+	};
+
+	type NodeNullLiteral = {
+		type: 'NullLiteral';
+		value: null;
+	};
+
+	type NodeStringLiteral = {
+		type: 'StringLiteral';
+		value: string;
+	};
+
+	type NodeNumericLiteral = {
+		type: 'NumericLiteral';
+		value: number;
+	};
+
+	function PrimaryExpression() {
+		switch (tokenizer.next()?.type) {
+			case 'L_PARENTHESIS':
+				return ParenthesisExpression();
+			case 'IDENTIFIER':
+				return Identifier();
+			default:
+				return Literal();
+		}
+	}
+
+	function ParenthesisExpression() {
+		tokenizer.advance('L_PARENTHESIS');
+		const expression = Expression();
+		tokenizer.advance('R_PARENTHESIS');
+
+		return expression;
+	}
+
+	function Literal() {
+		switch (tokenizer.next()?.type) {
+			case 'TRUE':
+				return TrueLiteral();
+			case 'FALSE':
+				return FalseLiteral();
+			case 'NULL':
+				return NullLiteral();
+			case 'STRING':
+				return StringLiteral();
+			case 'NUMBER':
+				return NumericLiteral();
+		}
+	}
+
+	function Identifier(): NodeIdentifier {
+		const token = tokenizer.advance('IDENTIFIER');
+
+		return {
+			type: 'Identifier',
+			value: token.value,
+		};
+	}
+
+	function TrueLiteral(): NodeBooleanLiteral {
+		tokenizer.advance('TRUE');
+
+		return {
+			type: 'BooleanLiteral',
+			value: true,
+		};
+	}
+
+	function FalseLiteral(): NodeBooleanLiteral {
+		tokenizer.advance('FALSE');
+
+		return {
+			type: 'BooleanLiteral',
+			value: false,
+		};
+	}
+
+	function NullLiteral(): NodeNullLiteral {
+		tokenizer.advance('NULL');
+
+		return {
+			type: 'NullLiteral',
+			value: null,
+		};
+	}
+
+	function StringLiteral(): NodeStringLiteral {
+		const token = tokenizer.advance('STRING');
+
+		return {
+			type: 'StringLiteral',
+			value: token.value.slice(1, -1),
+		};
+	}
+
+	function NumericLiteral(): NodeNumericLiteral {
+		const token = tokenizer.advance('NUMBER');
+
+		return {
+			type: 'NumericLiteral',
+			value: Number(token.value),
+		};
+	}
+
+	return RootExpression();
 }
 
 function ParseTemplate(input_template: string) {
@@ -76,6 +543,13 @@ function ParseTemplate(input_template: string) {
 	];
 
 	const tokenizer = Tokenizer(input_template, template_tokens);
+
+	function RootTemplate(): RootTemplate {
+		return {
+			type: 'RootTemplate',
+			value: NodeList(),
+		};
+	}
 
 	function Node(token_type: any): NodeType | null {
 		switch (token_type) {
@@ -193,7 +667,7 @@ function ParseTemplate(input_template: string) {
 
 		return {
 			type: 'Tag',
-			value: expression_string,
+			value: ParseExpression(expression_string),
 		};
 	}
 
@@ -216,14 +690,7 @@ function ParseTemplate(input_template: string) {
 		return null;
 	}
 
-	function Root(): Root {
-		return {
-			type: 'Root',
-			value: NodeList(),
-		};
-	}
-
-	return Root();
+	return RootTemplate();
 }
 
 export function Parse(input_template: string) {

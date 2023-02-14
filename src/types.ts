@@ -37,7 +37,7 @@ export type NodeText = {
 	value: string;
 };
 
-export type Root = {
-	type: 'Root';
+export type RootTemplate = {
+	type: 'RootTemplate';
 	value: NodeTypeList;
 };

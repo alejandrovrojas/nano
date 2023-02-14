@@ -1,4 +1,4 @@
-import type { Root } from '../src/types.ts';
+import type { RootTemplate } from '../src/types.ts';
 import { Parse } from '../src/parser.ts';
 import { assertEquals } from 'https://deno.land/std/testing/asserts.ts';
 
@@ -7,7 +7,7 @@ const tests = [
 		name: 'if else',
 		expression: `{if this} A {else} B {/if}`,
 		result: {
-			type: 'Root',
+			type: 'RootTemplate',
 			value: [
 				{
 					type: 'If',

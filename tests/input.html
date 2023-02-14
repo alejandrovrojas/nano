@@ -1,22 +1,3 @@
-<!DOCTYPE html>
-<!-- comment -->
-<html lang="{$meta.language}">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-		<title>{$meta.title}</title>
-
-		{if $dev}
-			<link rel="stylesheet" href="/style/style.css" />
-			<script type="module" src="/script/script.js"></script>
-		{else}
-			<link rel="stylesheet" href="/assets/app.css?v=f8ff076f" />
-			<script type="module" src="/assets/app.js?v=f8ff076f"></script>
-		{/if}
-	</head>
-
-	<body>
-		<template name="page"></template>
-	</body>
-</html>
+{ do(do(1)) }
+{ also.do(1) }
+{ also['do'](1) }
