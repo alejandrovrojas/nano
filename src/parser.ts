@@ -23,7 +23,7 @@ type LogicalExpression = NodeLogicalExpression | BinaryExpression;
 type BinaryExpression = NodeBinaryExpression | UnaryExpression;
 type UnaryExpression = NodeUnaryExpression | VariableExpression;
 
-type VariableExpression = VariableCall | FunctionCall;
+type VariableExpression = FunctionCall | VariableCall;
 
 type FunctionCall = NodeFunctionCall | VariableCall;
 type VariableCall = NodeVariableCall | PrimaryExpression;
