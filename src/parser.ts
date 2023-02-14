@@ -13,18 +13,21 @@ import type {
 
 import { Tokenizer } from './tokenizer.ts';
 
-type Expression = NodeTernaryExpression | LogicalExpression;
-
 type IdentifierList = NodeIdentifier[];
+type FunctionArgumentList = VariableExpression[];
+
+// type ParenthesisExpression = Expression;
+type Expression = TernaryExpression;
+type TernaryExpression = NodeTernaryExpression | LogicalExpression;
+type LogicalExpression = NodeLogicalExpression | BinaryExpression;
+type BinaryExpression = NodeBinaryExpression | UnaryExpression;
 type UnaryExpression = NodeUnaryExpression | VariableExpression;
 
-type FunctionCall = NodeVariableCall | VariableCall;
-type VariableCall = NodeVariableCall | PrimaryExpression;
 type VariableExpression = VariableCall | FunctionCall;
 
-type FunctionArguments = VariableExpression[];
-type PrimaryExpression = ParenthesisExpression | NodeIdentifier | Literal;
-type ParenthesisExpression = Expression;
+type FunctionCall = NodeFunctionCall | VariableCall;
+type VariableCall = NodeVariableCall | PrimaryExpression;
+type PrimaryExpression = Expression | NodeIdentifier | Literal;
 
 type Literal = NodeBooleanLiteral | NodeNullLiteral | NodeStringLiteral | NodeNumericLiteral;
 
@@ -64,7 +67,7 @@ type NodeVariableCall = {
 type NodeFunctionCall = {
 	type: 'FunctionCall';
 	function: NodeFunctionCall | NodeVariableCall | NodeIdentifier;
-	arguments: FunctionArguments;
+	arguments: FunctionArgumentList;
 };
 
 type NodeIdentifier = {
@@ -236,11 +239,11 @@ function ParseExpression(input_expression: string) {
 		};
 	}
 
-	function Expression() {
+	function Expression(): Expression {
 		return TernaryExpression();
 	}
 
-	function TernaryExpression() {
+	function TernaryExpression(): TernaryExpression {
 		const left = OrExpression();
 
 		if (tokenizer.next() && tokenizer.next()?.type === 'QUESTIONMARK') {
@@ -263,7 +266,7 @@ function ParseExpression(input_expression: string) {
 		}
 	}
 
-	function BinaryExpression(expression_method: any, token_type: string) {
+	function BinaryExpression(expression_method: any, token_type: string): BinaryExpression {
 		let left = expression_method();
 
 		while (tokenizer.next() && tokenizer.next()?.type === token_type) {
@@ -281,7 +284,7 @@ function ParseExpression(input_expression: string) {
 		return left;
 	}
 
-	function LogicalExpression(expression_method: any, token_type: string) {
+	function LogicalExpression(expression_method: any, token_type: string): LogicalExpression {
 		let left = expression_method();
 
 		while (tokenizer.next() && tokenizer.next()?.type === token_type) {
@@ -299,31 +302,31 @@ function ParseExpression(input_expression: string) {
 		return left;
 	}
 
-	function OrExpression() {
+	function OrExpression(): LogicalExpression {
 		return LogicalExpression(AndExpression, 'AND');
 	}
 
-	function AndExpression() {
+	function AndExpression(): LogicalExpression {
 		return LogicalExpression(EqualityExpression, 'OR');
 	}
 
-	function EqualityExpression() {
+	function EqualityExpression(): BinaryExpression {
 		return BinaryExpression(RelationalExpression, 'EQUALITY');
 	}
 
-	function RelationalExpression() {
+	function RelationalExpression(): BinaryExpression {
 		return BinaryExpression(AddExpression, 'RELATIONAL');
 	}
 
-	function AddExpression() {
+	function AddExpression(): BinaryExpression {
 		return BinaryExpression(MultiExpression, 'ADDITIVE');
 	}
 
-	function MultiExpression() {
+	function MultiExpression(): BinaryExpression {
 		return BinaryExpression(UnaryExpression, 'MULTIPLICATIVE');
 	}
 
-	function UnaryExpression() {
+	function UnaryExpression(): UnaryExpression {
 		let unary_operator: Token | null = null;
 
 		if (tokenizer.next()) {
@@ -347,6 +350,20 @@ function ParseExpression(input_expression: string) {
 		}
 
 		return VariableExpression();
+	}
+
+	function VariableExpression(): VariableExpression {
+		/**
+		 * VariableCall invokes a PrimaryExpression which is
+		 * the "last stop" before defaulting to literals
+		 * */
+		const variable_call = VariableCall();
+
+		if (tokenizer.next() && tokenizer.next()?.type === 'L_PARENTHESIS') {
+			return FunctionCall(variable_call);
+		}
+
+		return variable_call;
 	}
 
 	function VariableCall() {
@@ -384,11 +401,11 @@ function ParseExpression(input_expression: string) {
 		return variable;
 	}
 
-	function FunctionCall(recursive_call: any) {
+	function FunctionCall(nested_expression_call: any): FunctionCall {
 		let current_expression: NodeFunctionCall = {
 			type: 'FunctionCall',
-			function: recursive_call,
-			arguments: FunctionArguments(),
+			function: nested_expression_call,
+			arguments: FunctionArgumentList(),
 		};
 
 		if (tokenizer.next() && tokenizer.next()?.type === 'L_PARENTHESIS') {
@@ -398,20 +415,10 @@ function ParseExpression(input_expression: string) {
 		return current_expression;
 	}
 
-	function VariableExpression(): VariableExpression {
-		const variable_call = VariableCall();
-
-		if (tokenizer.next() && tokenizer.next()?.type === 'L_PARENTHESIS') {
-			return FunctionCall(variable_call);
-		}
-
-		return variable_call;
-	}
-
-	function FunctionArguments(): FunctionArguments {
+	function FunctionArgumentList(): FunctionArgumentList {
 		tokenizer.advance('L_PARENTHESIS');
 
-		const argument_list: FunctionArguments = [];
+		const argument_list: FunctionArgumentList = [];
 		const is_inside_parenthesis = tokenizer.next() && tokenizer.next()?.type !== 'R_PARENTHESIS';
 
 		if (is_inside_parenthesis) {
@@ -436,7 +443,7 @@ function ParseExpression(input_expression: string) {
 		}
 	}
 
-	function ParenthesisExpression(): ParenthesisExpression {
+	function ParenthesisExpression(): Expression {
 		tokenizer.advance('L_PARENTHESIS');
 		const expression = Expression();
 		tokenizer.advance('R_PARENTHESIS');
