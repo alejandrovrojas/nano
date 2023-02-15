@@ -16,25 +16,30 @@ import { Tokenizer } from './tokenizer.ts';
 type IdentifierList = NodeIdentifier[];
 type FunctionArgumentList = VariableExpression[];
 
-type Expression = TernaryExpression;
-type TernaryExpression = NodeTernaryExpression | LogicalExpression;
+type Expression = ConditionalExpression;
+type ConditionalExpression = NodeConditionalExpression | LogicalExpression;
 type LogicalExpression = NodeLogicalExpression | BinaryExpression;
 type BinaryExpression = NodeBinaryExpression | UnaryExpression;
 type UnaryExpression = NodeUnaryExpression | VariableExpression;
 
-type VariableExpression = FunctionCall | VariableCall;
+type VariableExpression = CallExpression | MemberExpression;
 
-type FunctionCall = NodeFunctionCall | VariableCall;
-type VariableCall = NodeVariableCall | PrimaryExpression;
+type CallExpression = NodeCallExpression | MemberExpression;
+type MemberExpression = NodeMemberExpression | PrimaryExpression;
 type PrimaryExpression = Expression | NodeIdentifier | Literal;
 
-type Literal = NodeBooleanLiteral | NodeNullLiteral | NodeStringLiteral | NodeNumericLiteral;
+type NodeLiteral = NodeBooleanLiteral | NodeNullLiteral | NodeStringLiteral | NodeNumericLiteral;
 
-type NodeTernaryExpression = {
-	type: 'TernaryExpression';
+type NodeExpression = {
+	type: 'ExpressionStatement';
+	expression: ConditionalExpression;
+};
+
+type NodeConditionalExpression = {
+	type: 'ConditionalExpression';
 	test: NodeLogicalExpression;
-	consequent: Expression;
-	alternate: Expression;
+	consequent: NodeExpression;
+	alternate: NodeExpression;
 };
 
 type NodeLogicalExpression = {
@@ -57,15 +62,15 @@ type NodeUnaryExpression = {
 	value: VariableExpression;
 };
 
-type NodeVariableCall = {
-	type: 'VariableCall';
-	variable: NodeVariableCall | NodeIdentifier;
-	property: NodeStringLiteral | Expression;
+type NodeMemberExpression = {
+	type: 'MemberExpression';
+	object: NodeMemberExpression | NodeIdentifier;
+	property: NodeStringLiteral | NodeExpression;
 };
 
-type NodeFunctionCall = {
-	type: 'FunctionCall';
-	function: NodeFunctionCall | NodeVariableCall | NodeIdentifier;
+type NodeCallExpression = {
+	type: 'CallExpression';
+	callee: NodeMemberExpression | NodeIdentifier;
 	arguments: FunctionArgumentList;
 };
 
@@ -238,11 +243,14 @@ function ParseExpression(input_expression: string) {
 		};
 	}
 
-	function Expression(): Expression {
-		return TernaryExpression();
+	function Expression(): NodeExpression {
+		return {
+			type: 'ExpressionStatement',
+			expression: ConditionalExpression(),
+		};
 	}
 
-	function TernaryExpression(): TernaryExpression {
+	function ConditionalExpression(): ConditionalExpression {
 		const left = OrExpression();
 
 		if (tokenizer.next() && tokenizer.next()?.type === 'QUESTIONMARK') {
@@ -255,7 +263,7 @@ function ParseExpression(input_expression: string) {
 			const alternate = Expression();
 
 			return {
-				type: 'TernaryExpression',
+				type: 'ConditionalExpression',
 				test: left,
 				consequent,
 				alternate,
@@ -352,35 +360,29 @@ function ParseExpression(input_expression: string) {
 	}
 
 	function VariableExpression(): VariableExpression {
-		/**
-		 * VariableCall invokes a PrimaryExpression which is
-		 * the "last stop" before defaulting to literals
-		 * */
-		const variable_call = VariableCall();
+		/* should only allow identifiers or members */
+		const member_expression = MemberExpression();
 
 		if (tokenizer.next() && tokenizer.next()?.type === 'L_PARENTHESIS') {
-			return FunctionCall(variable_call);
+			return CallExpression(member_expression);
 		}
 
-		return variable_call;
+		return member_expression;
 	}
 
-	function VariableCall() {
-		let variable: PrimaryExpression | NodeVariableCall = PrimaryExpression();
+	function MemberExpression() {
+		let object = Identifier();
 
 		while (tokenizer.next() && (tokenizer.next()?.type === 'DOT' || tokenizer.next()?.type === 'L_BRACKET')) {
 			if (tokenizer.next()?.type === 'DOT') {
 				tokenizer.advance('DOT');
 
-				const property = Identifier();
+				const property = MemberExpression();
 
-				variable = {
-					type: 'VariableCall',
-					variable,
-					property: {
-						type: 'StringLiteral',
-						value: property.value,
-					},
+				object = {
+					type: 'MemberExpression',
+					object,
+					property,
 				};
 			} else if (tokenizer.next()?.type === 'L_BRACKET') {
 				tokenizer.advance('L_BRACKET');
@@ -389,26 +391,26 @@ function ParseExpression(input_expression: string) {
 
 				tokenizer.advance('R_BRACKET');
 
-				variable = {
-					type: 'VariableCall',
-					variable,
+				object = {
+					type: 'MemberExpression',
+					object,
 					property,
 				};
 			}
 		}
 
-		return variable;
+		return object;
 	}
 
-	function FunctionCall(nested_expression_call: any): FunctionCall {
-		let current_expression: NodeFunctionCall = {
-			type: 'FunctionCall',
-			function: nested_expression_call,
+	function CallExpression(nested_expression: any): CallExpression {
+		let current_expression: NodeCallExpression = {
+			type: 'CallExpression',
+			callee: nested_expression,
 			arguments: FunctionArgumentList(),
 		};
 
 		if (tokenizer.next() && tokenizer.next()?.type === 'L_PARENTHESIS') {
-			current_expression = FunctionCall(current_expression);
+			current_expression = CallExpression(current_expression);
 		}
 
 		return current_expression;
@@ -434,7 +436,7 @@ function ParseExpression(input_expression: string) {
 	function PrimaryExpression(): PrimaryExpression {
 		switch (tokenizer.next()?.type) {
 			case 'L_PARENTHESIS':
-				return ParenthesisExpression();
+				return CallExpression();
 			case 'IDENTIFIER':
 				return Identifier();
 			default:
@@ -460,7 +462,7 @@ function ParseExpression(input_expression: string) {
 		return declarations;
 	}
 
-	function Literal(): Literal | undefined {
+	function Literal(): NodeLiteral | undefined {
 		switch (tokenizer.next()?.type) {
 			case 'TRUE':
 				return TrueLiteral();
