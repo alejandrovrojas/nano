@@ -16,88 +16,90 @@ import { Tokenizer } from './tokenizer.ts';
 type IdentifierList = NodeIdentifier[];
 type FunctionArgumentList = VariableExpression[];
 
-type Expression = ConditionalExpression;
-type ConditionalExpression = NodeConditionalExpression | LogicalExpression;
-type LogicalExpression = NodeLogicalExpression | BinaryExpression;
-type BinaryExpression = NodeBinaryExpression | UnaryExpression;
-type UnaryExpression = NodeUnaryExpression | VariableExpression;
+/*prettier-ignore*/
+type NodeLiteral =
+	| NodeBooleanLiteral
+	| NodeNullLiteral
+	| NodeStringLiteral
+	| NodeNumericLiteral;
 
-type VariableExpression = CallExpression | MemberExpression;
+type NodeExpression =
+	| NodeConditionalExpression
+	| NodeLogicalExpression
+	| NodeBinaryExpression
+	| NodeUnaryExpression
+	| NodeMemberExpression
+	| NodeCallExpression
+	| NodeIdentifier
+	| NodeLiteral;
 
-type CallExpression = NodeCallExpression | MemberExpression;
-type MemberExpression = NodeMemberExpression | PrimaryExpression;
-type PrimaryExpression = Expression | NodeIdentifier | Literal;
+interface Node {
+	type: string;
+}
 
-type NodeLiteral = NodeBooleanLiteral | NodeNullLiteral | NodeStringLiteral | NodeNumericLiteral;
-
-type NodeExpression = {
-	type: 'ExpressionStatement';
-	expression: ConditionalExpression;
-};
-
-type NodeConditionalExpression = {
+interface NodeConditionalExpression extends Node {
 	type: 'ConditionalExpression';
 	test: NodeLogicalExpression;
 	consequent: NodeExpression;
 	alternate: NodeExpression;
-};
+}
 
-type NodeLogicalExpression = {
+interface NodeLogicalExpression extends Node {
 	type: 'LogicalExpression';
 	operator: string;
 	left: NodeLogicalExpression | NodeBinaryExpression;
 	right: NodeLogicalExpression | NodeBinaryExpression;
-};
+}
 
-type NodeBinaryExpression = {
+interface NodeBinaryExpression extends Node {
 	type: 'BinaryExpression';
 	operator: string;
 	left: NodeBinaryExpression | NodeUnaryExpression;
 	right: NodeBinaryExpression | NodeUnaryExpression;
-};
+}
 
-type NodeUnaryExpression = {
+interface NodeUnaryExpression extends Node {
 	type: 'UnaryExpression';
 	operator: string;
 	value: VariableExpression;
-};
+}
 
-type NodeMemberExpression = {
+interface NodeMemberExpression extends Node {
 	type: 'MemberExpression';
 	object: NodeMemberExpression | NodeIdentifier;
 	property: NodeStringLiteral | NodeExpression;
-};
+}
 
-type NodeCallExpression = {
+interface NodeCallExpression extends Node {
 	type: 'CallExpression';
 	callee: NodeMemberExpression | NodeIdentifier;
 	arguments: FunctionArgumentList;
-};
+}
 
-type NodeIdentifier = {
+interface NodeIdentifier extends Node {
 	type: 'Identifier';
 	value: string;
-};
+}
 
-type NodeBooleanLiteral = {
+interface NodeBooleanLiteral extends Node {
 	type: 'BooleanLiteral';
 	value: true | false;
-};
+}
 
-type NodeNullLiteral = {
+interface NodeNullLiteral extends Node {
 	type: 'NullLiteral';
 	value: null;
-};
+}
 
-type NodeStringLiteral = {
+interface NodeStringLiteral extends Node {
 	type: 'StringLiteral';
 	value: string;
-};
+}
 
-type NodeNumericLiteral = {
+interface NodeNumericLiteral extends Node {
 	type: 'NumericLiteral';
 	value: number;
-};
+}
 
 function ParseExpression(input_expression: string) {
 	const expression_tokens: TokenSpec = [
@@ -243,14 +245,11 @@ function ParseExpression(input_expression: string) {
 		};
 	}
 
-	function Expression(): NodeExpression {
-		return {
-			type: 'ExpressionStatement',
-			expression: ConditionalExpression(),
-		};
+	function Expression() {
+		return ConditionalExpression();
 	}
 
-	function ConditionalExpression(): ConditionalExpression {
+	function ConditionalExpression() {
 		const left = OrExpression();
 
 		if (tokenizer.next() && tokenizer.next()?.type === 'QUESTIONMARK') {
@@ -360,7 +359,13 @@ function ParseExpression(input_expression: string) {
 	}
 
 	function VariableExpression(): VariableExpression {
-		/* should only allow identifiers or members */
+		/**
+		 * @NOTE	the order of operations could be reconsidered
+		 *      	at some point, also in relation to PrimaryExpression().
+		 *      	as of now it's not possible to chain method calls'
+		 *      	member expressions e.g. something().like().this() though
+		 *      	it's partly a technical limitation with this parser
+		 * */
 		const member_expression = MemberExpression();
 
 		if (tokenizer.next() && tokenizer.next()?.type === 'L_PARENTHESIS') {
@@ -371,7 +376,7 @@ function ParseExpression(input_expression: string) {
 	}
 
 	function MemberExpression() {
-		let object = Identifier();
+		let object = PrimaryExpression();
 
 		while (tokenizer.next() && (tokenizer.next()?.type === 'DOT' || tokenizer.next()?.type === 'L_BRACKET')) {
 			if (tokenizer.next()?.type === 'DOT') {
@@ -420,9 +425,8 @@ function ParseExpression(input_expression: string) {
 		tokenizer.advance('L_PARENTHESIS');
 
 		const argument_list: FunctionArgumentList = [];
-		const is_inside_parenthesis = tokenizer.next() && tokenizer.next()?.type !== 'R_PARENTHESIS';
 
-		if (is_inside_parenthesis) {
+		if (tokenizer.next() && tokenizer.next()?.type !== 'R_PARENTHESIS') {
 			do {
 				argument_list.push(VariableExpression());
 			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
@@ -434,9 +438,15 @@ function ParseExpression(input_expression: string) {
 	}
 
 	function PrimaryExpression(): PrimaryExpression {
+		/**
+		 * @NOTE	this should be refactored at some point.
+		 *      	by using Literal as the default switch it
+		 *      	allows member expressions using literal values
+		 *      	e.g. something.2.like."this"
+		 * */
 		switch (tokenizer.next()?.type) {
 			case 'L_PARENTHESIS':
-				return CallExpression();
+				return ParenthesisExpression();
 			case 'IDENTIFIER':
 				return Identifier();
 			default:

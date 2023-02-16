@@ -29,7 +29,7 @@ export type NodeFor = {
 
 export type NodeTag = {
 	type: 'Tag';
-	value: string;
+	value: any; //NodeExpression
 };
 
 export type NodeText = {
