@@ -4,6 +4,7 @@ import { NanoError } from './classes.ts';
 export function Tokenizer(input: string, token_spec: TokenSpecList) {
 	let line = 0;
 	let cursor = 0;
+	let current_input = input;
 	let next_token = traverse_next_token();
 
 	function traverse_next_token(): Token | null {
@@ -11,7 +12,7 @@ export function Tokenizer(input: string, token_spec: TokenSpecList) {
 			return null;
 		}
 
-		const current_input = input.slice(cursor);
+		current_input = input.slice(cursor);
 
 		for (const [token_regexp, token_type] of token_spec) {
 			const token_match = return_token_match(token_regexp, current_input);
@@ -56,6 +57,10 @@ export function Tokenizer(input: string, token_spec: TokenSpecList) {
 		return line;
 	}
 
+	function return_current_input() {
+		return current_input;
+	}
+
 	function has_remaining_tokens() {
 		return cursor < input.length;
 	}
@@ -76,6 +81,7 @@ export function Tokenizer(input: string, token_spec: TokenSpecList) {
 	}
 
 	return {
+		input: return_current_input,
 		line: return_current_line,
 		next: return_next_token,
 		advance: traverse_and_set_token,
