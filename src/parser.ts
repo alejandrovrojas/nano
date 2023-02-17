@@ -134,6 +134,9 @@ function ExpressionParser(input_expression: string) {
 
 		/**
 		 * @TODO	this should probably throw if identifiers.length > 2.
+		 *      	because the allowed syntax by the interpreter is either
+		 *      	{for a in x} or {for a, b in x} where a, b equals to
+		 *      	value, index or key, value depending on the iterator
 		 * */
 
 		return {
@@ -264,7 +267,8 @@ function ExpressionParser(input_expression: string) {
 		 *      	at some point, also in relation to PrimaryExpression().
 		 *      	as of now it's not possible to chain method calls'
 		 *      	member expressions e.g. something().like().this() though
-		 *      	it's partly a technical limitation with this parser
+		 *      	(at least as far as i know) this is partly a technical
+		 *      	limitation of this type of parser
 		 * */
 		const member_expression = MemberExpression();
 
@@ -339,12 +343,15 @@ function ExpressionParser(input_expression: string) {
 
 	function PrimaryExpression() {
 		/**
-		 * @NOTE	this should be refactored at some point.by
-		 *      	using Literal as the default switch it allows
+		 * @NOTE	this should be refactored at some point.
+		 *      	using Literal as the default switch allows
 		 *      	member expressions using literal values
 		 *      	e.g. something.2.like."this" which is somewhat
-		 *      	inconsistent in addition to supporting the
-		 *      	bracket system
+		 *      	unexpected when the rest of the syntax
+		 *      	otherwise looks like a subset of javascript.
+		 *      	also, this parser already supports property
+		 *      	access using a bracket syntax, so supporting
+		 *      	both methods is inconsistent and unexpected
 		 * */
 		switch (tokenizer.next()?.type) {
 			case 'L_PARENTHESIS':
