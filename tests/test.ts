@@ -1,14 +1,21 @@
-import type { Template } from '../src/types.ts';
-import { Parse } from '../src/parser.ts';
+import type { NodeBlockList } from '../src/types.ts';
+
+type Test = {
+	name: string;
+	input: string;
+	parsed: NodeBlockList;
+};
+
+import { parse } from '../src/parser.ts';
 import { assertEquals } from 'https://deno.land/std/testing/asserts.ts';
 
-const tests = [
+const tests: Test[] = [
 	{
 		name: 'if else',
-		expression: `{if this} A {else} B {/if}`,
-		result: {
-			type: 'Template',
-			value: [
+		input: `{if this} A {else} B {/if}`,
+		parsed: {
+			type: 'BlockList',
+			nodes: [
 				{
 					type: 'If',
 					statement: {
@@ -31,6 +38,6 @@ const tests = [
 
 for (const test of tests) {
 	Deno.test('>> ' + test.name, () => {
-		assertEquals(Parse(test.expression), test.result as Template);
+		assertEquals(parse(test.input), test.parsed);
 	});
 }
