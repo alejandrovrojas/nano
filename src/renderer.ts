@@ -25,7 +25,7 @@ import type {
 } from './types.ts';
 
 import { parse } from './parser.ts';
-import { join as join_path, isAbsolute as is_path_absolute } from 'https://deno.land/std@0.165.0/path/mod.ts';
+import { join_path, is_path_absolute } from './dependencies.ts';
 
 export function Renderer(input_template_parsed: NodeBlockList, input_data: InputData, input_settings: InputSettings) {
 	async function BlockList(node: NodeBlockList, node_data?: InputData): Promise<string> {
