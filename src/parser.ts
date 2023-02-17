@@ -457,7 +457,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 	};
 }
 
-function Parser(input_template: string) {
+function TemplateParser(input_template: string) {
 	const template_tokens: TokenSpec = [
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
@@ -677,5 +677,5 @@ function Parser(input_template: string) {
 }
 
 export function parse(input_template: string) {
-	return Parser(input_template).parse();
+	return TemplateParser(input_template).parse();
 }
