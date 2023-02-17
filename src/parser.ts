@@ -170,7 +170,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 				test: left,
 				consequent,
 				alternate,
-			};
+			} as NodeConditionalExpression;
 		} else {
 			return left;
 		}
@@ -188,7 +188,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 				operator: operator_token.value,
 				left,
 				right,
-			};
+			} as NodeBinaryExpression;
 		}
 
 		return left;
@@ -206,7 +206,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 				operator: operator_token.value,
 				left,
 				right,
-			};
+			} as NodeLogicalExpression;
 		}
 
 		return left;
@@ -295,7 +295,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 					type: 'MemberExpression',
 					object,
 					property,
-				};
+				} as NodeMemberExpression;
 			} else if (tokenizer.next()?.type === 'L_BRACKET') {
 				tokenizer.advance('L_BRACKET');
 
@@ -307,7 +307,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 					type: 'MemberExpression',
 					object,
 					property,
-				};
+				} as NodeMemberExpression;
 			}
 		}
 
