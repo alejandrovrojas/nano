@@ -30,138 +30,134 @@ export type NodeIdentifierList = Array<NodeIdentifier>;
 export type NodeCallExpressionArgumentList = Array<NodeExpression | NodeLiteral>;
 export type NodeImportStatementArgumentList = Array<NodeImportStatementArgument>;
 
-export interface Token {
+export type Token = {
 	type: string;
 	value: string;
-}
+};
 
-export interface Node {
-	type: string;
-}
-
-export interface Root {
+export type Root = {
 	type: 'Root';
 	value: NodeBlockList;
-}
+};
 
-export interface NodeImport extends Node {
+export type NodeImport = {
 	type: 'Import';
 	statement: NodeImportStatement;
-}
+};
 
-export interface NodeImportStatement extends Node {
+export type NodeImportStatement = {
 	type: 'ImportStatement';
 	path: NodeExpression | NodeLiteral;
 	with: NodeImportStatementArgumentList;
-}
+};
 
-export interface NodeImportStatementArgument extends Node {
+export type NodeImportStatementArgument = {
 	type: 'ImportStatementArgument';
 	value: {
 		key: string;
 		value: NodeExpression | NodeLiteral;
 	};
-}
+};
 
-export interface NodeIf extends Node {
+export type NodeIf = {
 	type: 'If';
 	statement: NodeIfStatement;
 	consequent: NodeBlockList;
 	alternate: NodeIf | NodeElse | null;
-}
+};
 
-export interface NodeIfStatement extends Node {
+export type NodeIfStatement = {
 	type: 'IfStatement';
 	test: NodeExpression | NodeLiteral;
-}
+};
 
-export interface NodeElse extends Node {
+export type NodeElse = {
 	type: 'Else';
 	value: NodeBlockList;
-}
+};
 
-export interface NodeFor extends Node {
+export type NodeFor = {
 	type: 'For';
 	statement: NodeForStatement;
 	value: NodeBlockList;
-}
+};
 
-export interface NodeForStatement extends Node {
+export type NodeForStatement = {
 	type: 'ForStatement';
 	identifiers: NodeIdentifierList;
 	iterator: NodeExpression | NodeLiteral;
-}
+};
 
-export interface NodeTag extends Node {
+export type NodeTag = {
 	type: 'Tag';
 	value: NodeExpression | NodeLiteral;
-}
+};
 
-export interface NodeText extends Node {
+export type NodeText = {
 	type: 'Text';
 	value: string;
-}
+};
 
-export interface NodeConditionalExpression extends Node {
+export type NodeConditionalExpression = {
 	type: 'ConditionalExpression';
 	test: NodeExpression;
 	consequent: NodeExpression | NodeLiteral;
 	alternate: NodeExpression | NodeLiteral;
-}
+};
 
-export interface NodeLogicalExpression extends Node {
+export type NodeLogicalExpression = {
 	type: 'LogicalExpression';
 	operator: string;
 	left: NodeExpression | NodeLiteral;
 	right: NodeExpression | NodeLiteral;
-}
+};
 
-export interface NodeBinaryExpression extends Node {
+export type NodeBinaryExpression = {
 	type: 'BinaryExpression';
 	operator: string;
 	left: NodeBinaryExpression | NodeUnaryExpression;
 	right: NodeBinaryExpression | NodeUnaryExpression;
-}
+};
 
-export interface NodeUnaryExpression extends Node {
+export type NodeUnaryExpression = {
 	type: 'UnaryExpression';
 	operator: string;
 	value: NodeExpression | NodeLiteral;
-}
+};
 
-export interface NodeMemberExpression extends Node {
+export type NodeMemberExpression = {
 	type: 'MemberExpression';
 	object: NodeExpression | NodeLiteral;
 	property: NodeExpression | NodeLiteral;
-}
+};
 
-export interface NodeCallExpression extends Node {
+export type NodeCallExpression = {
 	type: 'CallExpression';
 	callee: NodeMemberExpression | NodeIdentifier;
 	arguments: NodeCallExpressionArgumentList;
-}
+};
 
-export interface NodeIdentifier extends Node {
+export type NodeIdentifier = {
 	type: 'Identifier';
 	value: string;
-}
+};
 
-export interface NodeBooleanLiteral extends Node {
+export type NodeBooleanLiteral = {
 	type: 'BooleanLiteral';
 	value: true | false;
-}
+};
 
-export interface NodeNullLiteral extends Node {
+export type NodeNullLiteral = {
 	type: 'NullLiteral';
 	value: null;
-}
+};
 
-export interface NodeStringLiteral extends Node {
+export type NodeStringLiteral = {
 	type: 'StringLiteral';
 	value: string;
-}
+};
 
-export interface NodeNumericLiteral extends Node {
+export type NodeNumericLiteral = {
 	type: 'NumericLiteral';
 	value: number;
-}
+};
