@@ -268,29 +268,22 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 			return unary_expression;
 		}
 
-		return VariableExpression();
+		return MemberExpression();
 	}
 
 	function VariableExpression() {
-		/**
-		 * 	@NOTE	the order of operations could be reconsidered
-		 * 	at some point, also in relation to PrimaryExpression().
-		 * 	as of now it's not possible to chain method calls'
-		 * 	member expressions e.g. something().like().this() though
-		 * */
-		const member_expression = MemberExpression();
-
-		if (tokenizer.next() && tokenizer.next()?.type === 'L_PARENTHESIS') {
-			return CallExpression(member_expression);
-		}
-
-		return member_expression;
+		return MemberExpression();
 	}
 
 	function MemberExpression() {
 		let object = PrimaryExpression();
 
-		while (tokenizer.next() && (tokenizer.next()?.type === 'DOT' || tokenizer.next()?.type === 'L_BRACKET')) {
+		while (
+			tokenizer.next() &&
+			(tokenizer.next()?.type === 'DOT' ||
+				tokenizer.next()?.type === 'L_BRACKET' ||
+				tokenizer.next()?.type === 'L_PARENTHESIS')
+		) {
 			if (tokenizer.next()?.type === 'DOT') {
 				tokenizer.advance('DOT');
 
@@ -313,6 +306,8 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 					object,
 					property,
 				} as NodeMemberBracketExpression;
+			} else if (tokenizer.next()?.type === 'L_PARENTHESIS') {
+				object = CallExpression(object);
 			}
 		}
 
