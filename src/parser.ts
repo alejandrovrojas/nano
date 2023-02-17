@@ -14,6 +14,7 @@ import type {
 	NodeFor,
 	NodeTag,
 	NodeText,
+	NodeForStatement,
 	NodeConditionalExpression,
 	NodeLogicalExpression,
 	NodeBinaryExpression,
@@ -75,21 +76,6 @@ function ParseExpression(input_expression: string) {
 
 	const tokenizer = Tokenizer(input_expression, expression_tokens);
 
-	function RootExpression() {
-		switch (tokenizer.next()?.type) {
-			case 'IMPORT':
-				return ImportStatement();
-			case 'IF':
-				return IfStatement();
-			case 'ELSE':
-				return ElseStatement();
-			case 'FOR':
-				return ForStatement();
-			default:
-				return Expression();
-		}
-	}
-
 	function ImportStatement() {
 		tokenizer.advance('IMPORT');
 
@@ -101,7 +87,7 @@ function ParseExpression(input_expression: string) {
 			tokenizer.advance('L_PARENTHESIS');
 
 			do {
-				const pair = KeyValuePair();
+				const pair = ImportStatementArgumentList();
 				key_value_pairs.push(pair.value);
 			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
 
@@ -115,13 +101,13 @@ function ParseExpression(input_expression: string) {
 		};
 	}
 
-	function KeyValuePair() {
+	function ImportStatementArgumentList() {
 		const key = Identifier();
 		tokenizer.advance('COLON');
 		const value = VariableExpression();
 
 		return {
-			type: 'KeyValuePair',
+			type: 'ImportStatementArgumentList',
 			value: {
 				key: key.value,
 				value,
@@ -140,7 +126,7 @@ function ParseExpression(input_expression: string) {
 		};
 	}
 
-	function ElseStatement() {
+	/*	function ElseStatement() {
 		tokenizer.advance('ELSE');
 
 		if (tokenizer.next() && tokenizer.next()?.type === 'IF') {
@@ -156,8 +142,8 @@ function ParseExpression(input_expression: string) {
 			type: 'ElseStatement',
 		};
 	}
-
-	function ForStatement() {
+*/
+	function ForStatement(): NodeForStatement {
 		tokenizer.advance('FOR');
 		const identifiers = IdentifierList();
 		tokenizer.advance('IN');
@@ -169,7 +155,7 @@ function ParseExpression(input_expression: string) {
 
 		return {
 			type: 'ForStatement',
-			identifiers: identifiers.map((t: any) => t.value),
+			identifiers,
 			iterator,
 		};
 	}
@@ -476,7 +462,12 @@ function ParseExpression(input_expression: string) {
 		};
 	}
 
-	return RootExpression();
+	return {
+		import: ImportStatement,
+		if: IfStatement,
+		for: ForStatement,
+		expression: Expression,
+	};
 }
 
 function ParseTemplate(input_template: string) {
@@ -507,14 +498,14 @@ function ParseTemplate(input_template: string) {
 
 	function Node(token_type: any): NodeBlock | null {
 		switch (token_type) {
+			case 'FOR':
+				return For();
 			case 'IF':
 				return If();
 			case 'ELSEIF':
 				return ElseIf();
 			case 'ELSE':
 				return Else();
-			case 'FOR':
-				return For();
 			case 'TAG':
 				return Tag();
 			case 'TEXT':
@@ -542,15 +533,16 @@ function ParseTemplate(input_template: string) {
 	function For(): NodeFor {
 		const token = tokenizer.advance('FOR');
 		const expression_string = token.value.slice(1, -1);
-		const expression_parsed = expression_string;
+		const expression_parsed = ParseExpression(expression_string).for();
 		const value = NodeList('FOR_END');
 
 		tokenizer.advance('FOR_END');
 
+		console.log(expression_parsed);
+
 		return {
 			type: 'For',
-			variables: expression_string,
-			iterator: '',
+			statement: expression_parsed,
 			value: value,
 		};
 	}
@@ -558,7 +550,7 @@ function ParseTemplate(input_template: string) {
 	function If(token_type: 'IF' | 'ELSEIF' = 'IF'): NodeIf {
 		const token = tokenizer.advance(token_type);
 		const expression_string = token.value.slice(1, -1);
-		const expression_parsed = expression_string;
+		const expression_parsed = ParseExpression(expression_string);
 
 		let consequent: NodeBlockList = [];
 		let alternate: NodeIf | NodeElse | null = null;
@@ -618,10 +610,11 @@ function ParseTemplate(input_template: string) {
 	function Tag(): NodeTag {
 		const token = tokenizer.advance('TAG');
 		const expression_string = token.value.slice(1, -1);
+		const expression_parsed = ParseExpression(expression_string).expression();
 
 		return {
 			type: 'Tag',
-			value: ParseExpression(expression_string),
+			value: expression_parsed,
 		};
 	}
 

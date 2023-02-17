@@ -42,9 +42,15 @@ export interface Root {
 	value: NodeBlockList;
 }
 
+export interface NodeForStatement extends Node {
+	type: 'ForStatement';
+	identifiers: NodeIdentifierList;
+	iterator: NodeExpression | NodeLiteral;
+}
+
 export interface NodeIf extends Node {
 	type: 'If';
-	test: any;
+	test: any; // NodeExpression NodeIfStatement?
 	consequent: NodeBlockList;
 	alternate: NodeIf | NodeElse | null;
 }
@@ -56,9 +62,10 @@ export interface NodeElse extends Node {
 
 export interface NodeFor extends Node {
 	type: 'For';
-	variables: any;
-	iterator: any;
-	value: NodeBlockList;
+	statement: NodeForStatement;
+	// identifiers: NodeIdentifierList; //identifierlist
+	// iterator: NodeIdentifier; // identifier
+	// value: NodeBlockList;
 }
 
 export interface NodeTag extends Node {
