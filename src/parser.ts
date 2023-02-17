@@ -335,7 +335,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 
 		if (tokenizer.next() && tokenizer.next()?.type !== 'R_PARENTHESIS') {
 			do {
-				argument_list.push(VariableExpression());
+				argument_list.push(Expression());
 			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
 		}
 
