@@ -226,7 +226,7 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 			case '/':
 				return left / right;
 			default:
-				return ''; /** @NEVER **/
+				return ''; // @NEVER
 		}
 	}
 
@@ -316,7 +316,7 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 			case 'NullLiteral':
 				return Literal(node);
 			default:
-				return ''; //@NEVER
+				return ''; // @NEVER
 		}
 	}
 
