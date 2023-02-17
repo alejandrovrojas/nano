@@ -41,10 +41,8 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 
 		try {
 			//@ts-ignore
-			const import_context = node_data || input_data;
-			const imported_file = import_context[import_path] || (await Deno.readTextFile(import_path_prefixed));
-
-			const import_data = { ...import_context };
+			const import_data = node_data || input_data;
+			const imported_file = import_data[import_path] || (await Deno.readTextFile(import_path_prefixed));
 
 			/**
 			 * 	@YAGNI render "with" pairs as individual nodes and/or
@@ -57,7 +55,7 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 
 			for (const pair of node.statement.with) {
 				const key = pair.key;
-				const value = await render_node(pair.value, import_context);
+				const value = await render_node(pair.value, import_data);
 
 				import_data[key] = value;
 			}
