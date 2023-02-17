@@ -6,15 +6,15 @@ Nano is an `eval()`-free template engine.
 ### Usage
 As with any template processor, the output is rendered by combining a string template and a data object.
 
-```js
+```ts
 import render from 'https://deno.land/x/nano/mod.ts';
 
 const data = {
 	message: 'Hello',
-	shout: value => value + '!!!!',
+	shout: (value: string) => value + '!!!!',
 };
 
-const template = `<div>{ shout(message) }</div>`;
+const template = `<div>{shout(message)}</div>`;
 
 const result = await render(template, data);
 ```
