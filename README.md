@@ -93,7 +93,7 @@ The imported module will have access to the same data accessible to the file it'
 <!-- list_item.html -->
 <li>{fruit}</li>
 ```
-Therefore it's also possible to define/rewrite variables using the `with` keyword along with a list of `(key: value, key: value)` pairs
+It's also possible to define/rewrite variables using the `with` keyword along with a list of `(key: value, key: value)` pairs
 ```html
 <!-- list.html -->
 {for fruit, index in fruits}
@@ -103,6 +103,17 @@ Therefore it's also possible to define/rewrite variables using the `with` keywor
 <!-- list_item.html -->
 <li>{fruit} no. {number}</li>
 ```
+Before reading a file from disk, the renderer will look for a matching template inside the data object first. If an object key matches the import path, the string value will be loaded as a template. 
+```html
+{ import 'my_block.html' }
+```
+```js
+// data
+{
+  'my_block.html': '<div>...</div>'
+}
+```
+
 
 ---
 ### Other features
