@@ -109,7 +109,7 @@ function ExpressionParser(input_expression: string) {
 	function ImportStatementArgument(): NodeImportStatementArgument {
 		const key = Identifier();
 		tokenizer.advance('COLON');
-		const value = VariableExpression();
+		const value = Expression();
 
 		return {
 			type: 'ImportStatementArgument',
