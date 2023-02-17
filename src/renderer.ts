@@ -73,6 +73,7 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 	async function For(node: NodeFor, node_data?: InputData) {
 		const iterator_value = await render_node(node.statement.iterator, node_data);
 		const iterator_type = return_type(iterator_value);
+		const iterator_data = node_data || input_data;
 
 		let iterator: Array<[any, number]> | null = null;
 		let iterator_output: string = '';
@@ -105,17 +106,15 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 
 		if (iterator) {
 			for (const [loop_index_key, loop_value] of iterator) {
-				const block_input_data = { ...input_data };
-
 				if (iterator_index_key_name) {
-					block_input_data[iterator_index_key_name] = loop_index_key;
+					iterator_data[iterator_index_key_name] = loop_index_key;
 				}
 
 				if (iterator_value_name) {
-					block_input_data[iterator_value_name] = loop_value;
+					iterator_data[iterator_value_name] = loop_value;
 				}
 
-				iterator_output += await render_node(node.value, block_input_data);
+				iterator_output += await render_node(node.value, iterator_data);
 			}
 
 			return iterator_output;
