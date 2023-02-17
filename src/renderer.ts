@@ -233,8 +233,8 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 	}
 
 	async function Identifier(node: NodeIdentifier, node_data?: InputData): Promise<any> {
-		const context = node_data || input_data;
-		return context[node.value];
+		const identifier_data = node_data || input_data;
+		return identifier_data[node.value];
 	}
 
 	async function Tag(node: NodeTag, node_data?: InputData): Promise<any> {
