@@ -90,7 +90,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 	function ImportStatement(): NodeImportStatement {
 		tokenizer.advance('IMPORT');
 
-		const import_path = VariableExpression();
+		const import_path = Expression();
 		const import_with: NodeImportStatementArgumentList = [];
 
 		if (tokenizer.next() && tokenizer.next()?.type === 'WITH') {
@@ -140,7 +140,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 		tokenizer.advance('FOR');
 		const identifiers = IdentifierList();
 		tokenizer.advance('IN');
-		const iterator = VariableExpression();
+		const iterator = Expression();
 
 		/**
 		 * 	@YAGNI consider throwing if identifiers.length > 2
@@ -268,10 +268,6 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 			return unary_expression;
 		}
 
-		return MemberExpression();
-	}
-
-	function VariableExpression() {
 		return MemberExpression();
 	}
 
