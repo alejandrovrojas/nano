@@ -1,108 +1,37 @@
 import type {
 	Token,
-	TokenSpec,
-	NodeType,
-	NodeTypeList,
+	Node,
+	Root,
+	TokenSpecList,
+	NodeBlock,
+	NodeExpression,
+	NodeLiteral,
+	NodeBlockList,
+	NodeIdentifierList,
+	NodeCallExpressionArgumentList,
 	NodeIf,
 	NodeElse,
 	NodeFor,
 	NodeTag,
 	NodeText,
-	RootTemplate,
+	NodeConditionalExpression,
+	NodeLogicalExpression,
+	NodeBinaryExpression,
+	NodeUnaryExpression,
+	NodeMemberExpression,
+	NodeCallExpression,
+	NodeIdentifier,
+	NodeBooleanLiteral,
+	NodeNullLiteral,
+	NodeStringLiteral,
+	NodeNumericLiteral,
 } from './types.ts';
 
 import { Tokenizer } from './tokenizer.ts';
 import { NanoError } from './classes.ts';
 
-type NodeExpression =
-	| NodeConditionalExpression
-	| NodeLogicalExpression
-	| NodeBinaryExpression
-	| NodeUnaryExpression
-	| NodeMemberExpression
-	| NodeCallExpression
-	| NodeIdentifier;
-
-/*prettier-ignore*/
-type NodeLiteral =
-	| NodeBooleanLiteral
-	| NodeNullLiteral
-	| NodeStringLiteral
-	| NodeNumericLiteral;
-
-type IdentifierList = Array<NodeIdentifier>;
-type FunctionArgumentList = Array<NodeExpression | NodeLiteral>;
-
-interface Node {
-	type: string;
-}
-
-interface NodeConditionalExpression extends Node {
-	type: 'ConditionalExpression';
-	test: NodeExpression;
-	consequent: NodeExpression | NodeLiteral;
-	alternate: NodeExpression | NodeLiteral;
-}
-
-interface NodeLogicalExpression extends Node {
-	type: 'LogicalExpression';
-	operator: string;
-	left: NodeExpression | NodeLiteral;
-	right: NodeExpression | NodeLiteral;
-}
-
-interface NodeBinaryExpression extends Node {
-	type: 'BinaryExpression';
-	operator: string;
-	left: NodeBinaryExpression | NodeUnaryExpression;
-	right: NodeBinaryExpression | NodeUnaryExpression;
-}
-
-interface NodeUnaryExpression extends Node {
-	type: 'UnaryExpression';
-	operator: string;
-	value: NodeExpression | NodeLiteral;
-}
-
-interface NodeMemberExpression extends Node {
-	type: 'MemberExpression';
-	object: NodeExpression | NodeLiteral;
-	property: NodeExpression | NodeLiteral;
-}
-
-interface NodeCallExpression extends Node {
-	type: 'CallExpression';
-	callee: NodeMemberExpression | NodeIdentifier;
-	arguments: FunctionArgumentList;
-}
-
-interface NodeIdentifier extends Node {
-	type: 'Identifier';
-	value: string;
-}
-
-interface NodeBooleanLiteral extends Node {
-	type: 'BooleanLiteral';
-	value: true | false;
-}
-
-interface NodeNullLiteral extends Node {
-	type: 'NullLiteral';
-	value: null;
-}
-
-interface NodeStringLiteral extends Node {
-	type: 'StringLiteral';
-	value: string;
-}
-
-interface NodeNumericLiteral extends Node {
-	type: 'NumericLiteral';
-	value: number;
-}
-
 function ParseExpression(input_expression: string) {
-	const expression_tokens: TokenSpec = [
+	const expression_tokens: TokenSpecList = [
 		[/^\s+/, null],
 		[/^<!--[\s\S]*?-->/, null],
 
@@ -426,7 +355,7 @@ function ParseExpression(input_expression: string) {
 	function FunctionArgumentList() {
 		tokenizer.advance('L_PARENTHESIS');
 
-		const argument_list: FunctionArgumentList = [];
+		const argument_list: NodeCallExpressionArgumentList = [];
 
 		if (tokenizer.next() && tokenizer.next()?.type !== 'R_PARENTHESIS') {
 			do {
@@ -467,7 +396,7 @@ function ParseExpression(input_expression: string) {
 	}
 
 	function IdentifierList() {
-		const declarations: IdentifierList = [];
+		const declarations: NodeIdentifierList = [];
 
 		do {
 			declarations.push(Identifier());
@@ -551,7 +480,7 @@ function ParseExpression(input_expression: string) {
 }
 
 function ParseTemplate(input_template: string) {
-	const template_tokens: TokenSpec = [
+	const template_tokens: TokenSpecList = [
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
@@ -569,14 +498,14 @@ function ParseTemplate(input_template: string) {
 
 	const tokenizer = Tokenizer(input_template, template_tokens);
 
-	function RootTemplate(): RootTemplate {
+	function Root(): Root {
 		return {
-			type: 'RootTemplate',
+			type: 'Root',
 			value: NodeList(),
 		};
 	}
 
-	function Node(token_type: any): NodeType | null {
+	function Node(token_type: any): NodeBlock | null {
 		switch (token_type) {
 			case 'IF':
 				return If();
@@ -595,8 +524,8 @@ function ParseTemplate(input_template: string) {
 		}
 	}
 
-	function NodeList(token_type_limit: undefined | string = undefined): NodeTypeList {
-		const node_list: NodeTypeList = [];
+	function NodeList(token_type_limit: undefined | string = undefined): NodeBlockList {
+		const node_list: NodeBlockList = [];
 
 		while (tokenizer.next() && tokenizer.next()?.type !== token_type_limit) {
 			const next_type = tokenizer.next()?.type;
@@ -631,7 +560,7 @@ function ParseTemplate(input_template: string) {
 		const expression_string = token.value.slice(1, -1);
 		const expression_parsed = expression_string;
 
-		let consequent: NodeTypeList = [];
+		let consequent: NodeBlockList = [];
 		let alternate: NodeIf | NodeElse | null = null;
 
 		while (tokenizer.next() && tokenizer.next()?.type !== 'IF_END') {
@@ -715,7 +644,7 @@ function ParseTemplate(input_template: string) {
 		return null;
 	}
 
-	return RootTemplate();
+	return Root();
 }
 
 export function Parse(input_template: string) {

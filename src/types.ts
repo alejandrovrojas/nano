@@ -1,43 +1,136 @@
-export type TokenSpec = Array<[RegExp, string | null]>;
+/*prettier-ignore*/
+export type NodeBlock =
+	| NodeIf
+	| NodeElse
+	| NodeFor
+	| NodeTag
+	| NodeText;
 
-export type Token = {
+/*prettier-ignore*/
+export type NodeExpression =
+	| NodeConditionalExpression
+	| NodeLogicalExpression
+	| NodeBinaryExpression
+	| NodeUnaryExpression
+	| NodeMemberExpression
+	| NodeCallExpression
+	| NodeIdentifier;
+
+/*prettier-ignore*/
+export type NodeLiteral =
+	| NodeBooleanLiteral
+	| NodeNullLiteral
+	| NodeStringLiteral
+	| NodeNumericLiteral;
+
+export type TokenSpecList = Array<[RegExp, string | null]>;
+export type NodeBlockList = NodeBlock[];
+export type NodeIdentifierList = Array<NodeIdentifier>;
+export type NodeCallExpressionArgumentList = Array<NodeExpression | NodeLiteral>;
+
+export interface Token {
 	type: string;
 	value: string;
-};
+}
 
-export type NodeType = NodeIf | NodeElse | NodeFor | NodeTag | NodeText;
-export type NodeTypeList = NodeType[];
+export interface Node {
+	type: string;
+}
 
-export type NodeIf = {
+export interface Root {
+	type: 'Root';
+	value: NodeBlockList;
+}
+
+export interface NodeIf extends Node {
 	type: 'If';
 	test: any;
-	consequent: NodeTypeList;
+	consequent: NodeBlockList;
 	alternate: NodeIf | NodeElse | null;
-};
+}
 
-export type NodeElse = {
+export interface NodeElse extends Node {
 	type: 'Else';
-	value: NodeTypeList;
-};
+	value: NodeBlockList;
+}
 
-export type NodeFor = {
+export interface NodeFor extends Node {
 	type: 'For';
 	variables: any;
 	iterator: any;
-	value: NodeTypeList;
-};
+	value: NodeBlockList;
+}
 
-export type NodeTag = {
+export interface NodeTag extends Node {
 	type: 'Tag';
-	value: any; //NodeExpression
-};
+	value: any; //Expressions and statements
+}
 
-export type NodeText = {
+export interface NodeText extends Node {
 	type: 'Text';
 	value: string;
-};
+}
 
-export type RootTemplate = {
-	type: 'RootTemplate';
-	value: NodeTypeList;
-};
+export interface NodeConditionalExpression extends Node {
+	type: 'ConditionalExpression';
+	test: NodeExpression;
+	consequent: NodeExpression | NodeLiteral;
+	alternate: NodeExpression | NodeLiteral;
+}
+
+export interface NodeLogicalExpression extends Node {
+	type: 'LogicalExpression';
+	operator: string;
+	left: NodeExpression | NodeLiteral;
+	right: NodeExpression | NodeLiteral;
+}
+
+export interface NodeBinaryExpression extends Node {
+	type: 'BinaryExpression';
+	operator: string;
+	left: NodeBinaryExpression | NodeUnaryExpression;
+	right: NodeBinaryExpression | NodeUnaryExpression;
+}
+
+export interface NodeUnaryExpression extends Node {
+	type: 'UnaryExpression';
+	operator: string;
+	value: NodeExpression | NodeLiteral;
+}
+
+export interface NodeMemberExpression extends Node {
+	type: 'MemberExpression';
+	object: NodeExpression | NodeLiteral;
+	property: NodeExpression | NodeLiteral;
+}
+
+export interface NodeCallExpression extends Node {
+	type: 'CallExpression';
+	callee: NodeMemberExpression | NodeIdentifier;
+	arguments: NodeCallExpressionArgumentList;
+}
+
+export interface NodeIdentifier extends Node {
+	type: 'Identifier';
+	value: string;
+}
+
+export interface NodeBooleanLiteral extends Node {
+	type: 'BooleanLiteral';
+	value: true | false;
+}
+
+export interface NodeNullLiteral extends Node {
+	type: 'NullLiteral';
+	value: null;
+}
+
+export interface NodeStringLiteral extends Node {
+	type: 'StringLiteral';
+	value: string;
+}
+
+export interface NodeNumericLiteral extends Node {
+	type: 'NumericLiteral';
+	value: number;
+}
