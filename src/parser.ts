@@ -118,6 +118,10 @@ function ExpressionParser(input_expression: string) {
 	}
 
 	function IfStatement(): NodeIfStatement {
+		if (tokenizer.next() && tokenizer.next()?.type === 'ELSE') {
+			tokenizer.advance('ELSE');
+		}
+
 		tokenizer.advance('IF');
 
 		return {
