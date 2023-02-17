@@ -44,7 +44,7 @@ _Result_
 ```
 
 ```html
-<div>{nested['bracket']['notation']}</div>
+<div>{nested['property'][0]}</div>
 ```
 
 ```html
