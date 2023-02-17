@@ -1,6 +1,5 @@
 import type {
 	Token,
-	Node,
 	Root,
 	TokenSpecList,
 	NodeBlock,
