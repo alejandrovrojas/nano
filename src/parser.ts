@@ -386,7 +386,7 @@ function ExpressionParser(input_expression: string) {
 			case 'NUMBER':
 				return NumericLiteral();
 			default:
-				throw new NanoError(`Unexpected token ${tokenizer.next()?.value} ${tokenizer.line()}`);
+				throw new NanoError(`Unknown tag {${tokenizer.input()}}`);
 		}
 	}
 
