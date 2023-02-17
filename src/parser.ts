@@ -456,7 +456,7 @@ function ExpressionParser(input_expression: string) {
 	};
 }
 
-function ParseTemplate(input_template: string) {
+function TemplateParser(input_template: string) {
 	const template_tokens: TokenSpecList = [
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
@@ -632,9 +632,11 @@ function ParseTemplate(input_template: string) {
 		return null;
 	}
 
-	return Root();
+	return {
+		parse: Root,
+	};
 }
 
 export function Parse(input_template: string) {
-	return ParseTemplate(input_template);
+	return TemplateParser(input_template).parse();
 }
