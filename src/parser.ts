@@ -4,10 +4,11 @@ import type {
 	TokenSpecList,
 	TemplateBlock,
 	TemplateBlockList,
-	NodeExpression,
-	NodeLiteral,
+	NodeFlagList,
 	NodeIdentifierList,
 	NodeCallExpressionArgumentList,
+	NodeExpression,
+	NodeLiteral,
 	NodeImport,
 	NodeIf,
 	NodeElse,
@@ -457,17 +458,17 @@ function TemplateParser(input_template: string) {
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
-		[/^{import [\s\S]*?}/, 'IMPORT'],
+		[/^{!?#?!?#?import [\s\S]*?}/, 'IMPORT'],
 
-		[/^{if [\s\S]*?}/, 'IF'],
-		[/^{else if [\s\S]*?}/, 'ELSEIF'],
-		[/^{else}/, 'ELSE'],
+		[/^{!?#?!?#?if [\s\S]*?}/, 'IF'],
+		[/^{!?#?!?#?else if [\s\S]*?}/, 'ELSEIF'],
+		[/^{!?#?!?#?else}/, 'ELSE'],
 		[/^{\/if}/, 'IF_END'],
 
-		[/^{for [\s\S]*?}/, 'FOR'],
+		[/^{!?#?!?#?for [\s\S]*?}/, 'FOR'],
 		[/^{\/for}/, 'FOR_END'],
 
-		[/^{[\s\S]*?}/, 'TAG'],
+		[/^{!?#?!?#?[\s\S]*?}/, 'TAG'],
 		[/^[\s\S]?/, 'TEXT'],
 	];
 
@@ -484,7 +485,7 @@ function TemplateParser(input_template: string) {
 	 * @TODO handle flags like ! and
 	 * */
 
-	function TemplateBlock(token_type: any): TemplateBlock | null {
+	function TemplateBlock(token_type: string | undefined): TemplateBlock | null {
 		switch (token_type) {
 			case 'IMPORT':
 				return Import();
@@ -505,7 +506,10 @@ function TemplateParser(input_template: string) {
 		}
 	}
 
-	function TemplateBlockList(token_type_limit: undefined | string = undefined): TemplateBlockList {
+	function TemplateBlockList(
+		token_type_limit: string | undefined = undefined,
+		flags: NodeFlagList = []
+	): TemplateBlockList {
 		const node_list: TemplateBlockList = [];
 
 		while (tokenizer.next() && tokenizer.next()?.type !== token_type_limit) {
@@ -513,6 +517,10 @@ function TemplateParser(input_template: string) {
 			const next_node = TemplateBlock(next_type);
 
 			if (next_node) {
+				if (next_node.type === 'Text' && flags.length > 0) {
+					next_node.flags = flags;
+				}
+
 				node_list.push(next_node);
 			}
 		}
@@ -531,17 +539,21 @@ function TemplateParser(input_template: string) {
 		};
 	}
 
-	function For(flags = []): NodeFor {
+	function For(): NodeFor {
 		const token = tokenizer.advance('FOR');
-		const expression = token.value.slice(1, -1);
+		const flags = token.value.match(/#|!/g) || [];
+		const expression = token.value.slice(flags.length + 1, -1);
 		const statement = ExpressionParser(expression).for_statement();
-		const value = TemplateBlockList('FOR_END');
+		const value = TemplateBlockList('FOR_END', flags);
 
-		tokenizer.advance('FOR_END');
+		try {
+			tokenizer.advance('FOR_END');
+		} catch (error) {
+			throw new NanoError(`Missing {/for} closing tag (line ${tokenizer.line()})`);
+		}
 
 		return {
 			type: 'For',
-			flags,
 			statement,
 			value,
 		};
@@ -549,7 +561,8 @@ function TemplateParser(input_template: string) {
 
 	function If(token_type: 'IF' | 'ELSEIF' = 'IF'): NodeIf {
 		const token = tokenizer.advance(token_type);
-		const expression = token.value.slice(1, -1);
+		const flags = token.value.match(/#|!/g) || [];
+		const expression = token.value.slice(flags.length + 1, -1);
 		const statement = ExpressionParser(expression).if_statement();
 
 		let consequent: TemplateBlockList = [];
@@ -565,18 +578,22 @@ function TemplateParser(input_template: string) {
 				} else if (next_type === 'ELSE') {
 					alternate = next_node as NodeElse;
 				} else {
+					if (next_node.type === 'Text' && flags.length > 0) {
+						next_node.flags = flags;
+					}
+
 					consequent.push(next_node);
 				}
 			}
 		}
 
-		// try {
-		if (token_type === 'IF') {
-			tokenizer.advance('IF_END');
+		try {
+			if (token_type === 'IF') {
+				tokenizer.advance('IF_END');
+			}
+		} catch (error) {
+			throw new NanoError(`Missing {/if} closing tag (line ${tokenizer.line()})`);
 		}
-		// } catch (error) {
-		// 	throw new NanoError(`Missing {/if} closing tag (line ${tokenizer.line()})`);
-		// }
 
 		return {
 			type: 'If',
@@ -601,13 +618,20 @@ function TemplateParser(input_template: string) {
 
 	function Tag(): NodeTag {
 		const token = tokenizer.advance('TAG');
-		const expression_string = token.value.slice(1, -1);
-		const expression_parsed = ExpressionParser(expression_string).expression();
+		const flags = token.value.match(/#|!/g) || [];
+		const expression = token.value.slice(flags.length + 1, -1);
+		const value = ExpressionParser(expression).expression();
 
-		return {
+		const tag_node: NodeTag = {
 			type: 'Tag',
-			value: expression_parsed,
+			value,
 		};
+
+		if (flags.length > 0) {
+			tag_node.flags = flags;
+		}
+
+		return tag_node;
 	}
 
 	function Text(): NodeText {

@@ -25,6 +25,7 @@ export type NodeLiteral =
 	| NodeStringLiteral
 	| NodeNumericLiteral;
 
+export type NodeFlagList = RegExpMatchArray;
 export type TokenSpecList = Array<[RegExp, string | null]>;
 export type TemplateBlockList = TemplateBlock[];
 export type NodeIdentifierList = Array<NodeIdentifier>;
@@ -77,7 +78,6 @@ export type NodeElse = {
 
 export type NodeFor = {
 	type: 'For';
-	flags: any;
 	statement: NodeForStatement;
 	value: TemplateBlockList;
 };
@@ -91,11 +91,13 @@ export type NodeForStatement = {
 export type NodeTag = {
 	type: 'Tag';
 	value: NodeExpression;
+	flags?: NodeFlagList;
 };
 
 export type NodeText = {
 	type: 'Text';
 	value: string;
+	flags?: NodeFlagList;
 };
 
 export type NodeConditionalExpression = {
