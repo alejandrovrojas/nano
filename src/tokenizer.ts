@@ -1,10 +1,10 @@
 import type { Token, TokenSpecList } from './types.ts';
 import { NanoError } from './classes.ts';
 
-export function Tokenizer(input: string, token_spec: TokenSpecList) {
+export function Tokenizer(input_template: string, token_spec: TokenSpecList) {
 	let line = 0;
 	let cursor = 0;
-	let current_input = input;
+	let input = input_template;
 	let next_token = traverse_next_token();
 
 	function traverse_next_token(): Token | null {
@@ -12,10 +12,10 @@ export function Tokenizer(input: string, token_spec: TokenSpecList) {
 			return null;
 		}
 
-		current_input = input.slice(cursor);
+		input = input_template.slice(cursor);
 
 		for (const [token_regexp, token_type] of token_spec) {
-			const token_match = return_token_match(token_regexp, current_input);
+			const token_match = return_token_match(token_regexp, input);
 
 			if (token_match === null) {
 				continue;
@@ -41,7 +41,7 @@ export function Tokenizer(input: string, token_spec: TokenSpecList) {
 			return new_token;
 		}
 
-		throw new NanoError(`Unexpected token ${current_input[0]} (line ${line})`);
+		throw new NanoError(`Unexpected token ${input[0]} (line ${line})`);
 	}
 
 	function return_token_match(token_regexp: RegExp, string_input: string) {
@@ -58,11 +58,11 @@ export function Tokenizer(input: string, token_spec: TokenSpecList) {
 	}
 
 	function return_current_input() {
-		return current_input;
+		return input;
 	}
 
 	function has_remaining_tokens() {
-		return cursor < input.length;
+		return cursor < input_template.length;
 	}
 
 	function traverse_and_set_token(token_type_match: string | undefined = undefined) {
