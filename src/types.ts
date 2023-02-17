@@ -1,5 +1,6 @@
 /*prettier-ignore*/
 export type NodeBlock =
+	| NodeImport
 	| NodeIf
 	| NodeElse
 	| NodeFor
@@ -27,6 +28,7 @@ export type TokenSpecList = Array<[RegExp, string | null]>;
 export type NodeBlockList = NodeBlock[];
 export type NodeIdentifierList = Array<NodeIdentifier>;
 export type NodeCallExpressionArgumentList = Array<NodeExpression | NodeLiteral>;
+export type NodeImportStatementArgumentList = Array<NodeImportStatementArgument>;
 
 export interface Token {
 	type: string;
@@ -42,17 +44,35 @@ export interface Root {
 	value: NodeBlockList;
 }
 
-export interface NodeForStatement extends Node {
-	type: 'ForStatement';
-	identifiers: NodeIdentifierList;
-	iterator: NodeExpression | NodeLiteral;
+export interface NodeImport extends Node {
+	type: 'Import';
+	statement: NodeImportStatement;
+}
+
+export interface NodeImportStatement extends Node {
+	type: 'ImportStatement';
+	path: NodeExpression | NodeLiteral;
+	with: NodeImportStatementArgumentList;
+}
+
+export interface NodeImportStatementArgument extends Node {
+	type: 'ImportStatementArgument';
+	value: {
+		key: string;
+		value: NodeExpression | NodeLiteral;
+	};
 }
 
 export interface NodeIf extends Node {
 	type: 'If';
-	test: any; // NodeExpression NodeIfStatement?
+	statement: NodeIfStatement;
 	consequent: NodeBlockList;
 	alternate: NodeIf | NodeElse | null;
+}
+
+export interface NodeIfStatement extends Node {
+	type: 'IfStatement';
+	test: NodeExpression | NodeLiteral;
 }
 
 export interface NodeElse extends Node {
@@ -63,14 +83,18 @@ export interface NodeElse extends Node {
 export interface NodeFor extends Node {
 	type: 'For';
 	statement: NodeForStatement;
-	// identifiers: NodeIdentifierList; //identifierlist
-	// iterator: NodeIdentifier; // identifier
-	// value: NodeBlockList;
+	value: NodeBlockList;
+}
+
+export interface NodeForStatement extends Node {
+	type: 'ForStatement';
+	identifiers: NodeIdentifierList;
+	iterator: NodeExpression | NodeLiteral;
 }
 
 export interface NodeTag extends Node {
 	type: 'Tag';
-	value: any; //Expressions and statements
+	value: NodeExpression | NodeLiteral;
 }
 
 export interface NodeText extends Node {

@@ -9,11 +9,16 @@ import type {
 	NodeBlockList,
 	NodeIdentifierList,
 	NodeCallExpressionArgumentList,
+	NodeImport,
 	NodeIf,
 	NodeElse,
 	NodeFor,
 	NodeTag,
 	NodeText,
+	NodeIfStatement,
+	NodeImportStatement,
+	NodeImportStatementArgument,
+	NodeImportStatementArgumentList,
 	NodeForStatement,
 	NodeConditionalExpression,
 	NodeLogicalExpression,
@@ -31,7 +36,7 @@ import type {
 import { Tokenizer } from './tokenizer.ts';
 import { NanoError } from './classes.ts';
 
-function ParseExpression(input_expression: string) {
+function ExpressionParser(input_expression: string) {
 	const expression_tokens: TokenSpecList = [
 		[/^\s+/, null],
 		[/^<!--[\s\S]*?-->/, null],
@@ -76,19 +81,19 @@ function ParseExpression(input_expression: string) {
 
 	const tokenizer = Tokenizer(input_expression, expression_tokens);
 
-	function ImportStatement() {
+	function ImportStatement(): NodeImportStatement {
 		tokenizer.advance('IMPORT');
 
-		const path_token = VariableExpression();
-		const key_value_pairs: Array<any> = [];
+		const import_path = VariableExpression();
+		const import_with: NodeImportStatementArgumentList = [];
 
 		if (tokenizer.next() && tokenizer.next()?.type === 'WITH') {
 			tokenizer.advance('WITH');
 			tokenizer.advance('L_PARENTHESIS');
 
 			do {
-				const pair = ImportStatementArgumentList();
-				key_value_pairs.push(pair.value);
+				const pair = ImportStatementArgument();
+				import_with.push(pair);
 			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
 
 			tokenizer.advance('R_PARENTHESIS');
@@ -96,18 +101,18 @@ function ParseExpression(input_expression: string) {
 
 		return {
 			type: 'ImportStatement',
-			path: path_token,
-			with: key_value_pairs,
+			path: import_path,
+			with: import_with,
 		};
 	}
 
-	function ImportStatementArgumentList() {
+	function ImportStatementArgument(): NodeImportStatementArgument {
 		const key = Identifier();
 		tokenizer.advance('COLON');
 		const value = VariableExpression();
 
 		return {
-			type: 'ImportStatementArgumentList',
+			type: 'ImportStatementArgument',
 			value: {
 				key: key.value,
 				value,
@@ -115,34 +120,15 @@ function ParseExpression(input_expression: string) {
 		};
 	}
 
-	function IfStatement() {
+	function IfStatement(): NodeIfStatement {
 		tokenizer.advance('IF');
-
-		const test = Expression();
 
 		return {
 			type: 'IfStatement',
-			test: test,
+			test: Expression(),
 		};
 	}
 
-	/*	function ElseStatement() {
-		tokenizer.advance('ELSE');
-
-		if (tokenizer.next() && tokenizer.next()?.type === 'IF') {
-			const if_statement = IfStatement();
-
-			return {
-				type: 'ElseIfStatement',
-				test: if_statement.test,
-			};
-		}
-
-		return {
-			type: 'ElseStatement',
-		};
-	}
-*/
 	function ForStatement(): NodeForStatement {
 		tokenizer.advance('FOR');
 		const identifiers = IdentifierList();
@@ -463,9 +449,9 @@ function ParseExpression(input_expression: string) {
 	}
 
 	return {
-		import: ImportStatement,
-		if: IfStatement,
-		for: ForStatement,
+		import_statement: ImportStatement,
+		if_statement: IfStatement,
+		for_statement: ForStatement,
 		expression: Expression,
 	};
 }
@@ -474,6 +460,8 @@ function ParseTemplate(input_template: string) {
 	const template_tokens: TokenSpecList = [
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
+
+		[/^{import [\s\S]*?}/, 'IMPORT'],
 
 		[/^{if [\s\S]*?}/, 'IF'],
 		[/^{else if [\s\S]*?}/, 'ELSEIF'],
@@ -496,8 +484,14 @@ function ParseTemplate(input_template: string) {
 		};
 	}
 
+	/**
+	 * @TODO handle flags like ! and
+	 * */
+
 	function Node(token_type: any): NodeBlock | null {
 		switch (token_type) {
+			case 'IMPORT':
+				return Import();
 			case 'FOR':
 				return For();
 			case 'IF':
@@ -530,27 +524,36 @@ function ParseTemplate(input_template: string) {
 		return node_list;
 	}
 
+	function Import(): NodeImport {
+		const token = tokenizer.advance('IMPORT');
+		const expression = token.value.slice(1, -1);
+		const statement = ExpressionParser(expression).import_statement();
+
+		return {
+			type: 'Import',
+			statement,
+		};
+	}
+
 	function For(): NodeFor {
 		const token = tokenizer.advance('FOR');
-		const expression_string = token.value.slice(1, -1);
-		const expression_parsed = ParseExpression(expression_string).for();
+		const expression = token.value.slice(1, -1);
+		const statement = ExpressionParser(expression).for_statement();
 		const value = NodeList('FOR_END');
 
 		tokenizer.advance('FOR_END');
 
-		console.log(expression_parsed);
-
 		return {
 			type: 'For',
-			statement: expression_parsed,
-			value: value,
+			statement,
+			value,
 		};
 	}
 
 	function If(token_type: 'IF' | 'ELSEIF' = 'IF'): NodeIf {
 		const token = tokenizer.advance(token_type);
-		const expression_string = token.value.slice(1, -1);
-		const expression_parsed = ParseExpression(expression_string);
+		const expression = token.value.slice(1, -1);
+		const statement = ExpressionParser(expression).if_statement();
 
 		let consequent: NodeBlockList = [];
 		let alternate: NodeIf | NodeElse | null = null;
@@ -565,14 +568,6 @@ function ParseTemplate(input_template: string) {
 				} else if (next_type === 'ELSE') {
 					alternate = next_node as NodeElse;
 				} else {
-					/**
-					 * @TODO handle flags
-					 * */
-
-					// if (next_type === 'TEXT') {
-					// 	next_node.flags = [true];
-					// }
-
 					consequent.push(next_node);
 				}
 			}
@@ -588,9 +583,9 @@ function ParseTemplate(input_template: string) {
 
 		return {
 			type: 'If',
-			test: expression_parsed,
-			consequent: consequent,
-			alternate: alternate,
+			statement,
+			consequent,
+			alternate,
 		};
 	}
 
@@ -610,7 +605,7 @@ function ParseTemplate(input_template: string) {
 	function Tag(): NodeTag {
 		const token = tokenizer.advance('TAG');
 		const expression_string = token.value.slice(1, -1);
-		const expression_parsed = ParseExpression(expression_string).expression();
+		const expression_parsed = ExpressionParser(expression_string).expression();
 
 		return {
 			type: 'Tag',
