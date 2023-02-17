@@ -1,11 +1,11 @@
 import type {
+	Template,
 	Token,
-	Root,
 	TokenSpecList,
-	NodeBlock,
+	TemplateBlock,
+	TemplateBlockList,
 	NodeExpression,
 	NodeLiteral,
-	NodeBlockList,
 	NodeIdentifierList,
 	NodeCallExpressionArgumentList,
 	NodeImport,
@@ -91,8 +91,7 @@ function ExpressionParser(input_expression: string) {
 			tokenizer.advance('L_PARENTHESIS');
 
 			do {
-				const pair = ImportStatementArgument();
-				import_with.push(pair);
+				import_with.push(ImportStatementArgument());
 			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
 
 			tokenizer.advance('R_PARENTHESIS');
@@ -112,10 +111,8 @@ function ExpressionParser(input_expression: string) {
 
 		return {
 			type: 'ImportStatementArgument',
-			value: {
-				key: key.value,
-				value,
-			},
+			key: key.value,
+			value,
 		};
 	}
 
@@ -476,10 +473,10 @@ function TemplateParser(input_template: string) {
 
 	const tokenizer = Tokenizer(input_template, template_tokens);
 
-	function Root(): Root {
+	function Template(): Template {
 		return {
-			type: 'Root',
-			value: NodeList(),
+			type: 'Template',
+			value: TemplateBlockList(),
 		};
 	}
 
@@ -487,7 +484,7 @@ function TemplateParser(input_template: string) {
 	 * @TODO handle flags like ! and
 	 * */
 
-	function Node(token_type: any): NodeBlock | null {
+	function TemplateBlock(token_type: any): TemplateBlock | null {
 		switch (token_type) {
 			case 'IMPORT':
 				return Import();
@@ -508,12 +505,12 @@ function TemplateParser(input_template: string) {
 		}
 	}
 
-	function NodeList(token_type_limit: undefined | string = undefined): NodeBlockList {
-		const node_list: NodeBlockList = [];
+	function TemplateBlockList(token_type_limit: undefined | string = undefined): TemplateBlockList {
+		const node_list: TemplateBlockList = [];
 
 		while (tokenizer.next() && tokenizer.next()?.type !== token_type_limit) {
 			const next_type = tokenizer.next()?.type;
-			const next_node = Node(next_type);
+			const next_node = TemplateBlock(next_type);
 
 			if (next_node) {
 				node_list.push(next_node);
@@ -534,16 +531,17 @@ function TemplateParser(input_template: string) {
 		};
 	}
 
-	function For(): NodeFor {
+	function For(flags = []): NodeFor {
 		const token = tokenizer.advance('FOR');
 		const expression = token.value.slice(1, -1);
 		const statement = ExpressionParser(expression).for_statement();
-		const value = NodeList('FOR_END');
+		const value = TemplateBlockList('FOR_END');
 
 		tokenizer.advance('FOR_END');
 
 		return {
 			type: 'For',
+			flags,
 			statement,
 			value,
 		};
@@ -554,12 +552,12 @@ function TemplateParser(input_template: string) {
 		const expression = token.value.slice(1, -1);
 		const statement = ExpressionParser(expression).if_statement();
 
-		let consequent: NodeBlockList = [];
+		let consequent: TemplateBlockList = [];
 		let alternate: NodeIf | NodeElse | null = null;
 
 		while (tokenizer.next() && tokenizer.next()?.type !== 'IF_END') {
 			const next_type = tokenizer.next()?.type;
-			const next_node = Node(next_type);
+			const next_node = TemplateBlock(next_type);
 
 			if (next_node) {
 				if (next_type === 'ELSEIF') {
@@ -597,7 +595,7 @@ function TemplateParser(input_template: string) {
 
 		return {
 			type: 'Else',
-			value: NodeList('IF_END'),
+			value: TemplateBlockList('IF_END'),
 		};
 	}
 
@@ -632,7 +630,7 @@ function TemplateParser(input_template: string) {
 	}
 
 	return {
-		parse: Root,
+		parse: Template,
 	};
 }
 

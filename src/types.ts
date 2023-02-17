@@ -1,5 +1,5 @@
 /*prettier-ignore*/
-export type NodeBlock =
+export type TemplateBlock =
 	| NodeImport
 	| NodeIf
 	| NodeElse
@@ -15,7 +15,8 @@ export type NodeExpression =
 	| NodeUnaryExpression
 	| NodeMemberExpression
 	| NodeCallExpression
-	| NodeIdentifier;
+	| NodeIdentifier
+	| NodeLiteral;
 
 /*prettier-ignore*/
 export type NodeLiteral =
@@ -25,9 +26,9 @@ export type NodeLiteral =
 	| NodeNumericLiteral;
 
 export type TokenSpecList = Array<[RegExp, string | null]>;
-export type NodeBlockList = NodeBlock[];
+export type TemplateBlockList = TemplateBlock[];
 export type NodeIdentifierList = Array<NodeIdentifier>;
-export type NodeCallExpressionArgumentList = Array<NodeExpression | NodeLiteral>;
+export type NodeCallExpressionArgumentList = Array<NodeExpression>;
 export type NodeImportStatementArgumentList = Array<NodeImportStatementArgument>;
 
 export type Token = {
@@ -35,9 +36,9 @@ export type Token = {
 	value: string;
 };
 
-export type Root = {
-	type: 'Root';
-	value: NodeBlockList;
+export type Template = {
+	type: 'Template';
+	value: TemplateBlockList;
 };
 
 export type NodeImport = {
@@ -47,50 +48,49 @@ export type NodeImport = {
 
 export type NodeImportStatement = {
 	type: 'ImportStatement';
-	path: NodeExpression | NodeLiteral;
+	path: NodeExpression;
 	with: NodeImportStatementArgumentList;
 };
 
 export type NodeImportStatementArgument = {
 	type: 'ImportStatementArgument';
-	value: {
-		key: string;
-		value: NodeExpression | NodeLiteral;
-	};
+	key: string;
+	value: NodeExpression;
 };
 
 export type NodeIf = {
 	type: 'If';
 	statement: NodeIfStatement;
-	consequent: NodeBlockList;
+	consequent: TemplateBlockList;
 	alternate: NodeIf | NodeElse | null;
 };
 
 export type NodeIfStatement = {
 	type: 'IfStatement';
-	test: NodeExpression | NodeLiteral;
+	test: NodeExpression;
 };
 
 export type NodeElse = {
 	type: 'Else';
-	value: NodeBlockList;
+	value: TemplateBlockList;
 };
 
 export type NodeFor = {
 	type: 'For';
+	flags: any;
 	statement: NodeForStatement;
-	value: NodeBlockList;
+	value: TemplateBlockList;
 };
 
 export type NodeForStatement = {
 	type: 'ForStatement';
 	identifiers: NodeIdentifierList;
-	iterator: NodeExpression | NodeLiteral;
+	iterator: NodeExpression;
 };
 
 export type NodeTag = {
 	type: 'Tag';
-	value: NodeExpression | NodeLiteral;
+	value: NodeExpression;
 };
 
 export type NodeText = {
@@ -101,15 +101,15 @@ export type NodeText = {
 export type NodeConditionalExpression = {
 	type: 'ConditionalExpression';
 	test: NodeExpression;
-	consequent: NodeExpression | NodeLiteral;
-	alternate: NodeExpression | NodeLiteral;
+	consequent: NodeExpression;
+	alternate: NodeExpression;
 };
 
 export type NodeLogicalExpression = {
 	type: 'LogicalExpression';
 	operator: string;
-	left: NodeExpression | NodeLiteral;
-	right: NodeExpression | NodeLiteral;
+	left: NodeExpression;
+	right: NodeExpression;
 };
 
 export type NodeBinaryExpression = {
@@ -122,13 +122,13 @@ export type NodeBinaryExpression = {
 export type NodeUnaryExpression = {
 	type: 'UnaryExpression';
 	operator: string;
-	value: NodeExpression | NodeLiteral;
+	value: NodeExpression;
 };
 
 export type NodeMemberExpression = {
 	type: 'MemberExpression';
-	object: NodeExpression | NodeLiteral;
-	property: NodeExpression | NodeLiteral;
+	object: NodeExpression;
+	property: NodeExpression;
 };
 
 export type NodeCallExpression = {
