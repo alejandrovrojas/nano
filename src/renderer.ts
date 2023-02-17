@@ -167,13 +167,12 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 
 	async function MemberExpression(node: NodeMemberExpression, node_data?: InputData) {
 		const object = await render_node(node.object, node_data);
-		const property = await render_node(node.property, node_data);
 
 		if (!object) {
 			return undefined;
 		}
 
-		return object[property];
+		return object[node.property.value];
 	}
 
 	async function ConditionalExpression(node: NodeConditionalExpression, node_data?: InputData) {
