@@ -19,6 +19,7 @@ import type {
 	NodeBinaryExpression,
 	NodeUnaryExpression,
 	NodeMemberExpression,
+	NodeMemberBracketExpression,
 	NodeCallExpression,
 	NodeIdentifier,
 } from './types.ts';
@@ -162,6 +163,17 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 		return object[node.property.value];
 	}
 
+	async function MemberBracketExpression(node: NodeMemberBracketExpression, node_data?: InputData) {
+		const object = await render_node(node.object, node_data);
+		const property = await render_node(node.property, node_data);
+
+		if (!object) {
+			return undefined;
+		}
+
+		return object[property];
+	}
+
 	async function ConditionalExpression(node: NodeConditionalExpression, node_data?: InputData) {
 		const test = await render_node(node.test, node_data);
 
@@ -282,6 +294,8 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 				return CallExpression(node, node_data);
 			case 'MemberExpression':
 				return MemberExpression(node, node_data);
+			case 'MemberBracketExpression':
+				return MemberBracketExpression(node, node_data);
 			case 'ConditionalExpression':
 				return ConditionalExpression(node, node_data);
 			case 'LogicalExpression':

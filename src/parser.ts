@@ -23,6 +23,7 @@ import type {
 	NodeBinaryExpression,
 	NodeUnaryExpression,
 	NodeMemberExpression,
+	NodeMemberBracketExpression,
 	NodeCallExpression,
 	NodeCallExpressionArgumentList,
 	NodeIdentifier,
@@ -304,10 +305,10 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 				tokenizer.advance('R_BRACKET');
 
 				object = {
-					type: 'MemberExpression',
+					type: 'MemberBracketExpression',
 					object,
 					property,
-				} as NodeMemberExpression;
+				} as NodeMemberBracketExpression;
 			}
 		}
 
