@@ -12,16 +12,7 @@ import type {
 } from './types.ts';
 
 import { Tokenizer } from './tokenizer.ts';
-
-type IdentifierList = NodeIdentifier[];
-type FunctionArgumentList = VariableExpression[];
-
-/*prettier-ignore*/
-type NodeLiteral =
-	| NodeBooleanLiteral
-	| NodeNullLiteral
-	| NodeStringLiteral
-	| NodeNumericLiteral;
+import { NanoError } from './classes.ts';
 
 type NodeExpression =
 	| NodeConditionalExpression
@@ -30,8 +21,17 @@ type NodeExpression =
 	| NodeUnaryExpression
 	| NodeMemberExpression
 	| NodeCallExpression
-	| NodeIdentifier
-	| NodeLiteral;
+	| NodeIdentifier;
+
+/*prettier-ignore*/
+type NodeLiteral =
+	| NodeBooleanLiteral
+	| NodeNullLiteral
+	| NodeStringLiteral
+	| NodeNumericLiteral;
+
+type IdentifierList = Array<NodeIdentifier>;
+type FunctionArgumentList = Array<NodeExpression | NodeLiteral>;
 
 interface Node {
 	type: string;
@@ -39,16 +39,16 @@ interface Node {
 
 interface NodeConditionalExpression extends Node {
 	type: 'ConditionalExpression';
-	test: NodeLogicalExpression;
-	consequent: NodeExpression;
-	alternate: NodeExpression;
+	test: NodeExpression;
+	consequent: NodeExpression | NodeLiteral;
+	alternate: NodeExpression | NodeLiteral;
 }
 
 interface NodeLogicalExpression extends Node {
 	type: 'LogicalExpression';
 	operator: string;
-	left: NodeLogicalExpression | NodeBinaryExpression;
-	right: NodeLogicalExpression | NodeBinaryExpression;
+	left: NodeExpression | NodeLiteral;
+	right: NodeExpression | NodeLiteral;
 }
 
 interface NodeBinaryExpression extends Node {
@@ -61,13 +61,13 @@ interface NodeBinaryExpression extends Node {
 interface NodeUnaryExpression extends Node {
 	type: 'UnaryExpression';
 	operator: string;
-	value: VariableExpression;
+	value: NodeExpression | NodeLiteral;
 }
 
 interface NodeMemberExpression extends Node {
 	type: 'MemberExpression';
-	object: NodeMemberExpression | NodeIdentifier;
-	property: NodeStringLiteral | NodeExpression;
+	object: NodeExpression | NodeLiteral;
+	property: NodeExpression | NodeLiteral;
 }
 
 interface NodeCallExpression extends Node {
@@ -235,7 +235,7 @@ function ParseExpression(input_expression: string) {
 		const iterator = VariableExpression();
 
 		/**
-		 * @TODO throw if identifiers.length > 2.
+		 * @TODO	this should probably throw if identifiers.length > 2.
 		 * */
 
 		return {
@@ -245,7 +245,7 @@ function ParseExpression(input_expression: string) {
 		};
 	}
 
-	function Expression() {
+	function Expression(): NodeExpression {
 		return ConditionalExpression();
 	}
 
@@ -272,7 +272,7 @@ function ParseExpression(input_expression: string) {
 		}
 	}
 
-	function BinaryExpression(expression_method: any, token_type: string): BinaryExpression {
+	function BinaryExpression(expression_method: any, token_type: string) {
 		let left = expression_method();
 
 		while (tokenizer.next() && tokenizer.next()?.type === token_type) {
@@ -290,7 +290,7 @@ function ParseExpression(input_expression: string) {
 		return left;
 	}
 
-	function LogicalExpression(expression_method: any, token_type: string): LogicalExpression {
+	function LogicalExpression(expression_method: any, token_type: string) {
 		let left = expression_method();
 
 		while (tokenizer.next() && tokenizer.next()?.type === token_type) {
@@ -308,31 +308,31 @@ function ParseExpression(input_expression: string) {
 		return left;
 	}
 
-	function OrExpression(): LogicalExpression {
+	function OrExpression() {
 		return LogicalExpression(AndExpression, 'AND');
 	}
 
-	function AndExpression(): LogicalExpression {
+	function AndExpression() {
 		return LogicalExpression(EqualityExpression, 'OR');
 	}
 
-	function EqualityExpression(): BinaryExpression {
+	function EqualityExpression() {
 		return BinaryExpression(RelationalExpression, 'EQUALITY');
 	}
 
-	function RelationalExpression(): BinaryExpression {
+	function RelationalExpression() {
 		return BinaryExpression(AddExpression, 'RELATIONAL');
 	}
 
-	function AddExpression(): BinaryExpression {
+	function AddExpression() {
 		return BinaryExpression(MultiExpression, 'ADDITIVE');
 	}
 
-	function MultiExpression(): BinaryExpression {
+	function MultiExpression() {
 		return BinaryExpression(UnaryExpression, 'MULTIPLICATIVE');
 	}
 
-	function UnaryExpression(): UnaryExpression {
+	function UnaryExpression() {
 		let unary_operator: Token | null = null;
 
 		if (tokenizer.next()) {
@@ -348,17 +348,19 @@ function ParseExpression(input_expression: string) {
 		}
 
 		if (unary_operator !== null) {
-			return {
+			const unary_expression: NodeUnaryExpression = {
 				type: 'UnaryExpression',
 				operator: unary_operator.value,
 				value: UnaryExpression(),
 			};
+
+			return unary_expression;
 		}
 
 		return VariableExpression();
 	}
 
-	function VariableExpression(): VariableExpression {
+	function VariableExpression() {
 		/**
 		 * @NOTE	the order of operations could be reconsidered
 		 *      	at some point, also in relation to PrimaryExpression().
@@ -407,7 +409,7 @@ function ParseExpression(input_expression: string) {
 		return object;
 	}
 
-	function CallExpression(nested_expression: any): CallExpression {
+	function CallExpression(nested_expression: any) {
 		let current_expression: NodeCallExpression = {
 			type: 'CallExpression',
 			callee: nested_expression,
@@ -421,7 +423,7 @@ function ParseExpression(input_expression: string) {
 		return current_expression;
 	}
 
-	function FunctionArgumentList(): FunctionArgumentList {
+	function FunctionArgumentList() {
 		tokenizer.advance('L_PARENTHESIS');
 
 		const argument_list: FunctionArgumentList = [];
@@ -437,12 +439,14 @@ function ParseExpression(input_expression: string) {
 		return argument_list;
 	}
 
-	function PrimaryExpression(): PrimaryExpression {
+	function PrimaryExpression() {
 		/**
-		 * @NOTE	this should be refactored at some point.
-		 *      	by using Literal as the default switch it
-		 *      	allows member expressions using literal values
-		 *      	e.g. something.2.like."this"
+		 * @NOTE	this should be refactored at some point.by
+		 *      	using Literal as the default switch it allows
+		 *      	member expressions using literal values
+		 *      	e.g. something.2.like."this" which is somewhat
+		 *      	inconsistent in addition to supporting the
+		 *      	bracket system
 		 * */
 		switch (tokenizer.next()?.type) {
 			case 'L_PARENTHESIS':
@@ -454,7 +458,7 @@ function ParseExpression(input_expression: string) {
 		}
 	}
 
-	function ParenthesisExpression(): Expression {
+	function ParenthesisExpression() {
 		tokenizer.advance('L_PARENTHESIS');
 		const expression = Expression();
 		tokenizer.advance('R_PARENTHESIS');
@@ -462,7 +466,7 @@ function ParseExpression(input_expression: string) {
 		return expression;
 	}
 
-	function IdentifierList(): IdentifierList {
+	function IdentifierList() {
 		const declarations: IdentifierList = [];
 
 		do {
@@ -472,7 +476,7 @@ function ParseExpression(input_expression: string) {
 		return declarations;
 	}
 
-	function Literal(): NodeLiteral | undefined {
+	function Literal(): NodeLiteral {
 		switch (tokenizer.next()?.type) {
 			case 'TRUE':
 				return TrueLiteral();
@@ -484,6 +488,8 @@ function ParseExpression(input_expression: string) {
 				return StringLiteral();
 			case 'NUMBER':
 				return NumericLiteral();
+			default:
+				throw new NanoError(`Unexpected token ${tokenizer.next()?.value} ${tokenizer.line()}`);
 		}
 	}
 
