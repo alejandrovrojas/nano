@@ -485,7 +485,9 @@ function TemplateParser(input_template: string) {
 
 	const tokenizer = Tokenizer(input_template, template_tokens);
 
-	console.log(tokenizer.next());
+	function parse() {
+		return NodeList();
+	}
 
 	function parse_token(token_type: string | undefined): Node | null {
 		switch (token_type) {
@@ -661,7 +663,7 @@ function TemplateParser(input_template: string) {
 	}
 
 	return {
-		parse: NodeList,
+		parse,
 	};
 }
 
