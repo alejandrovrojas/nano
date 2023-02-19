@@ -1,5 +1,12 @@
-/*prettier-ignore*/
-export type TemplateBlock =
+export type Token = {
+	type: string;
+	value: string;
+};
+
+export type TokenSpecList = Array<[RegExp, string | null]>;
+
+/* prettier-ignore */
+export type Node =
 	| NodeImport
 	| NodeIf
 	| NodeElse
@@ -7,7 +14,7 @@ export type TemplateBlock =
 	| NodeTag
 	| NodeText;
 
-/*prettier-ignore*/
+/* prettier-ignore */
 export type NodeExpression =
 	| NodeConditionalExpression
 	| NodeLogicalExpression
@@ -18,29 +25,33 @@ export type NodeExpression =
 	| NodeIdentifier
 	| NodeLiteral;
 
-/*prettier-ignore*/
+/* prettier-ignore */
 export type NodeLiteral =
 	| NodeBooleanLiteral
 	| NodeNullLiteral
 	| NodeStringLiteral
 	| NodeNumericLiteral;
 
-export type NodeFlagList = RegExpMatchArray | [];
-export type TokenSpecList = Array<[RegExp, string | null]>;
-export type TemplateBlockList = TemplateBlock[];
-export type NodeIdentifierList = Array<NodeIdentifier>;
-export type NodeCallExpressionArgumentList = Array<NodeExpression>;
-export type NodeImportStatementArgumentList = Array<NodeImportStatementArgument>;
+export type NodeNodeList = {
+	type: 'NodeList';
+	nodes: NodeList;
+};
 
-export type Token = {
-	type: string;
+export type NodeList = Node[];
+
+export type NodeText = {
+	type: 'Text';
 	value: string;
+	flags?: NodeFlagList;
 };
 
-export type Template = {
-	type: 'Template';
-	value: TemplateBlockList;
+export type NodeTag = {
+	type: 'Tag';
+	value: NodeExpression;
+	flags?: NodeFlagList;
 };
+
+export type NodeFlagList = RegExpMatchArray | [];
 
 export type NodeImport = {
 	type: 'Import';
@@ -59,10 +70,12 @@ export type NodeImportStatementArgument = {
 	value: NodeExpression;
 };
 
+export type NodeImportStatementArgumentList = NodeImportStatementArgument[];
+
 export type NodeIf = {
 	type: 'If';
 	statement: NodeIfStatement;
-	consequent: TemplateBlockList;
+	consequent: NodeNodeList;
 	alternate: NodeIf | NodeElse | null;
 };
 
@@ -73,13 +86,13 @@ export type NodeIfStatement = {
 
 export type NodeElse = {
 	type: 'Else';
-	value: TemplateBlockList;
+	value: NodeNodeList;
 };
 
 export type NodeFor = {
 	type: 'For';
 	statement: NodeForStatement;
-	value: TemplateBlockList;
+	value: NodeNodeList;
 };
 
 export type NodeForStatement = {
@@ -88,17 +101,7 @@ export type NodeForStatement = {
 	iterator: NodeExpression;
 };
 
-export type NodeTag = {
-	type: 'Tag';
-	value: NodeExpression;
-	flags?: NodeFlagList;
-};
-
-export type NodeText = {
-	type: 'Text';
-	value: string;
-	flags?: NodeFlagList;
-};
+export type NodeIdentifierList = NodeIdentifier[];
 
 export type NodeConditionalExpression = {
 	type: 'ConditionalExpression';
@@ -138,6 +141,8 @@ export type NodeCallExpression = {
 	callee: NodeMemberExpression | NodeIdentifier;
 	arguments: NodeCallExpressionArgumentList;
 };
+
+export type NodeCallExpressionArgumentList = NodeExpression[];
 
 export type NodeIdentifier = {
 	type: 'Identifier';

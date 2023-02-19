@@ -1,31 +1,31 @@
 import type {
-	Template,
 	Token,
 	TokenSpecList,
-	TemplateBlock,
-	TemplateBlockList,
-	NodeFlagList,
-	NodeIdentifierList,
-	NodeCallExpressionArgumentList,
+	Node,
 	NodeExpression,
 	NodeLiteral,
-	NodeImport,
-	NodeIf,
-	NodeElse,
-	NodeFor,
-	NodeTag,
+	NodeNodeList,
+	NodeList,
 	NodeText,
-	NodeIfStatement,
+	NodeTag,
+	NodeFlagList,
+	NodeImport,
 	NodeImportStatement,
 	NodeImportStatementArgument,
 	NodeImportStatementArgumentList,
+	NodeIf,
+	NodeIfStatement,
+	NodeElse,
+	NodeFor,
 	NodeForStatement,
+	NodeIdentifierList,
 	NodeConditionalExpression,
 	NodeLogicalExpression,
 	NodeBinaryExpression,
 	NodeUnaryExpression,
 	NodeMemberExpression,
 	NodeCallExpression,
+	NodeCallExpressionArgumentList,
 	NodeIdentifier,
 	NodeBooleanLiteral,
 	NodeNullLiteral,
@@ -485,29 +485,20 @@ function TemplateParser(input_template: string) {
 
 	const tokenizer = Tokenizer(input_template, template_tokens);
 
-	function Template(): Template {
-		return {
-			type: 'Template',
-			value: TemplateBlockList(),
-		};
-	}
+	console.log(tokenizer.next());
 
-	/**
-	 * @TODO handle flags like ! and
-	 * */
-
-	function TemplateBlock(token_type: string | undefined): TemplateBlock | null {
+	function parse_token(token_type: string | undefined): Node | null {
 		switch (token_type) {
 			case 'IMPORT':
 				return Import();
-			case 'FOR':
-				return For();
 			case 'IF':
 				return If();
 			case 'ELSEIF':
 				return ElseIf();
 			case 'ELSE':
 				return Else();
+			case 'FOR':
+				return For();
 			case 'TAG':
 				return Tag();
 			case 'TEXT':
@@ -517,17 +508,14 @@ function TemplateParser(input_template: string) {
 		}
 	}
 
-	function TemplateBlockList(
-		token_type_limit: string | undefined = undefined,
-		flags: NodeFlagList = []
-	): TemplateBlockList {
-		const node_list: TemplateBlockList = [];
+	function NodeList(token_type_limit: string | undefined = undefined, flags: NodeFlagList = []): NodeNodeList {
+		const node_list: NodeList = [];
 
 		while (tokenizer.next() && tokenizer.next()?.type !== token_type_limit) {
-			const next_type = tokenizer.next()?.type;
-			const next_node = TemplateBlock(next_type);
+			const next_type = tokenizer.next()?.type || '';
+			const next_node = parse_token(next_type);
 
-			if (next_node) {
+			if (next_node !== null) {
 				if (next_node.type === 'Text' && flags.length > 0) {
 					next_node.flags = flags;
 				}
@@ -536,7 +524,10 @@ function TemplateParser(input_template: string) {
 			}
 		}
 
-		return node_list;
+		return {
+			type: 'NodeList',
+			nodes: node_list,
+		};
 	}
 
 	function Import(): NodeImport {
@@ -555,7 +546,7 @@ function TemplateParser(input_template: string) {
 		const flags = token.value.match(/#|!/g) || [];
 		const expression = token.value.slice(flags.length + 1, -1);
 		const statement = ExpressionParser(expression).for_statement();
-		const value = TemplateBlockList('FOR_END', flags);
+		const value = NodeList('FOR_END', flags);
 
 		try {
 			tokenizer.advance('FOR_END');
@@ -576,12 +567,16 @@ function TemplateParser(input_template: string) {
 		const expression = token.value.slice(flags.length + 1, -1);
 		const statement = ExpressionParser(expression).if_statement();
 
-		let consequent: TemplateBlockList = [];
+		const consequent: NodeNodeList = {
+			type: 'NodeList',
+			nodes: [],
+		};
+
 		let alternate: NodeIf | NodeElse | null = null;
 
 		while (tokenizer.next() && tokenizer.next()?.type !== 'IF_END') {
 			const next_type = tokenizer.next()?.type;
-			const next_node = TemplateBlock(next_type);
+			const next_node = parse_token(next_type);
 
 			if (next_node) {
 				if (next_type === 'ELSEIF') {
@@ -593,7 +588,7 @@ function TemplateParser(input_template: string) {
 						next_node.flags = flags;
 					}
 
-					consequent.push(next_node);
+					consequent.nodes.push(next_node);
 				}
 			}
 		}
@@ -619,11 +614,12 @@ function TemplateParser(input_template: string) {
 	}
 
 	function Else(): NodeElse {
-		tokenizer.advance('ELSE');
+		const token = tokenizer.advance('ELSE');
+		const flags = token.value.match(/#|!/g) || [];
 
 		return {
 			type: 'Else',
-			value: TemplateBlockList('IF_END'),
+			value: NodeList('IF_END', flags),
 		};
 	}
 
@@ -665,7 +661,7 @@ function TemplateParser(input_template: string) {
 	}
 
 	return {
-		parse: Template,
+		parse: NodeList,
 	};
 }
 
