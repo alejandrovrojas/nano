@@ -669,6 +669,6 @@ function TemplateParser(input_template: string) {
 	};
 }
 
-export function Parse(input_template: string) {
+export function parse(input_template: string) {
 	return TemplateParser(input_template).parse();
 }
