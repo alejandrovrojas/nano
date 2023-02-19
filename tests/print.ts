@@ -1,7 +1,12 @@
-import { Parse } from '../src/parser.ts';
+import { parse } from '../src/parser.ts';
+import { render } from '../src/renderer.ts';
 
 try {
-	console.dir(Parse(Deno.readTextFileSync('tests/input.html')), { depth: 10 });
+	const input = Deno.readTextFileSync('tests/input.html');
+	const parsed = parse(input);
+	const rendered = await render(input);
+
+	console.dir(rendered, { depth: 10 });
 } catch (error) {
 	console.log(error);
 }
