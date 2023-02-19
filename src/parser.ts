@@ -137,10 +137,10 @@ function ExpressionParser(input_expression: string) {
 		const iterator = VariableExpression();
 
 		/**
-		 * @TODO	this should probably throw if identifiers.length > 2.
-		 *      	because the allowed syntax by the interpreter is either
-		 *      	{for a in x} or {for a, b in x} where a, b equals to
-		 *      	value, index or key, value depending on the iterator
+		 * @YAGNI	this should probably throw if identifiers.length > 2.
+		 *       	because the allowed syntax by the interpreter is either
+		 *       	{for a in x} or {for a, b in x} where a, b equals to
+		 *       	value, index or key, value depending on the iterator
 		 * */
 
 		return {
@@ -464,22 +464,22 @@ function ExpressionParser(input_expression: string) {
 	};
 }
 
-function TemplateParser(input_template: string) {
+function Parser(input_template: string) {
 	const template_tokens: TokenSpecList = [
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
-		[/^{!?#?!?#?import [\s\S]*?}/, 'IMPORT'],
+		[/^{[#!]{0,2}import [\s\S]*?}/, 'IMPORT'],
 
-		[/^{!?#?!?#?if [\s\S]*?}/, 'IF'],
-		[/^{!?#?!?#?else if [\s\S]*?}/, 'ELSEIF'],
-		[/^{!?#?!?#?else}/, 'ELSE'],
+		[/^{[#!]{0,2}if [\s\S]*?}/, 'IF'],
+		[/^{[#!]{0,2}else if [\s\S]*?}/, 'ELSEIF'],
+		[/^{[#!]{0,2}else}/, 'ELSE'],
 		[/^{\/if}/, 'IF_END'],
 
-		[/^{!?#?!?#?for [\s\S]*?}/, 'FOR'],
+		[/^{[#!]{0,2}for [\s\S]*?}/, 'FOR'],
 		[/^{\/for}/, 'FOR_END'],
 
-		[/^{!?#?!?#?[\s\S]*?}/, 'TAG'],
+		[/^{[#!]{0,2}[\s\S]*?}/, 'TAG'],
 		[/^[\s\S]?/, 'TEXT'],
 	];
 
@@ -565,8 +565,7 @@ function TemplateParser(input_template: string) {
 
 	function If(token_type: 'IF' | 'ELSEIF' = 'IF'): NodeIf {
 		const token = tokenizer.advance(token_type);
-		const flags = token.value.match(/#|!/g) || [];
-		const expression = token.value.slice(flags.length + 1, -1);
+		const { flags, expression } = handle_statement_tag(token.value);
 		const statement = ExpressionParser(expression).if_statement();
 
 		const consequent: NodeNodeList = {
@@ -617,7 +616,7 @@ function TemplateParser(input_template: string) {
 
 	function Else(): NodeElse {
 		const token = tokenizer.advance('ELSE');
-		const flags = token.value.match(/#|!/g) || [];
+		const { flags } = handle_statement_tag(token.value);
 
 		return {
 			type: 'Else',
@@ -627,8 +626,7 @@ function TemplateParser(input_template: string) {
 
 	function Tag(): NodeTag {
 		const token = tokenizer.advance('TAG');
-		const flags = token.value.match(/#|!/g) || [];
-		const expression = token.value.slice(flags.length + 1, -1);
+		const { flags, expression } = handle_statement_tag(token.value);
 		const value = ExpressionParser(expression).expression();
 
 		const tag_node: NodeTag = {
@@ -662,11 +660,28 @@ function TemplateParser(input_template: string) {
 		return null;
 	}
 
+	function handle_statement_tag(tag_string: string) {
+		const raw_string = tag_string.slice(1, -1);
+		const raw_flags_match = raw_string.match(/^[#!]{0,2}/);
+		const raw_flags = raw_flags_match ? raw_flags_match[0] : '';
+		const flags: NodeFlagList = raw_flags.split('');
+		const expression = raw_string.slice(flags.length);
+
+		/**
+		 * @YAGNI	throw in case of duplicate flags or wrong syntax?
+		 * */
+
+		return {
+			flags,
+			expression,
+		};
+	}
+
 	return {
 		parse,
 	};
 }
 
 export function parse(input_template: string) {
-	return TemplateParser(input_template).parse();
+	return Parser(input_template).parse();
 }

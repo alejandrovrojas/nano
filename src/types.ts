@@ -51,7 +51,7 @@ export type NodeTag = {
 	flags?: NodeFlagList;
 };
 
-export type NodeFlagList = RegExpMatchArray | [];
+export type NodeFlagList = string[] | [];
 
 export type NodeImport = {
 	type: 'Import';
