@@ -52,7 +52,8 @@ export function Renderer(parsed_template: NodeNodeList, input_data: InputData, i
 	async function Tag(node: NodeTag): Promise<any> {
 		const value = await render_node(node.value);
 
-		if (node.flags) {
+		if (node.flags !== undefined) {
+			return return_flagged_value(value, node.flags);
 		}
 
 		return value;
@@ -61,7 +62,8 @@ export function Renderer(parsed_template: NodeNodeList, input_data: InputData, i
 	async function Text(node: NodeText): Promise<string> {
 		const value = node.value;
 
-		if (node.flags) {
+		if (node.flags !== undefined) {
+			return return_flagged_value(value, node.flags);
 		}
 
 		return value;
@@ -134,6 +136,19 @@ export function Renderer(parsed_template: NodeNodeList, input_data: InputData, i
 
 	function return_type(value: any): string {
 		return Object.prototype.toString.call(value).slice(8, -1).toLowerCase();
+	}
+
+	function return_flagged_value(value: any, flags: NodeFlagList): string {
+		return [...flags].reduce((new_value: any, flag: string) => {
+			switch (flag) {
+				case '!':
+					return return_trimmed_string(new_value);
+				case '#':
+					return return_escaped_string(new_value);
+			}
+
+			return new_value;
+		}, value);
 	}
 
 	function return_trimmed_string(value: string): string {
