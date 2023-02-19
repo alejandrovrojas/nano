@@ -1,3 +1,7 @@
+export type InputTemplate = string;
+export type InputData = Record<string, any>;
+export type InputSettings = { import_directory: string };
+
 export type Token = {
 	type: string;
 	value: string;
