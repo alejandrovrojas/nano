@@ -1,59 +1,123 @@
 import type {
-	Template,
-	TemplateBlock,
-	TemplateBlockList,
-	NodeFlagList,
-	NodeIdentifierList,
-	NodeCallExpressionArgumentList,
+	InputTemplate,
+	InputData,
+	InputSettings,
+	Token,
+	TokenSpecList,
+	Node,
 	NodeExpression,
 	NodeLiteral,
-	NodeImport,
-	NodeIf,
-	NodeElse,
-	NodeFor,
-	NodeTag,
+	NodeNodeList,
+	NodeList,
 	NodeText,
-	NodeIfStatement,
+	NodeTag,
+	NodeFlagList,
+	NodeImport,
 	NodeImportStatement,
 	NodeImportStatementArgument,
 	NodeImportStatementArgumentList,
+	NodeIf,
+	NodeIfStatement,
+	NodeElse,
+	NodeFor,
 	NodeForStatement,
+	NodeIdentifierList,
 	NodeConditionalExpression,
 	NodeLogicalExpression,
 	NodeBinaryExpression,
 	NodeUnaryExpression,
 	NodeMemberExpression,
 	NodeCallExpression,
+	NodeCallExpressionArgumentList,
 	NodeIdentifier,
 	NodeBooleanLiteral,
 	NodeNullLiteral,
 	NodeStringLiteral,
 	NodeNumericLiteral,
 } from './types.ts';
+
 import { parse } from './parser.ts';
 
-export function TemplateRenderer(parsed_template: Template, input_data: InputData, input_settings: InputSettings) {
-	function Literal(node: NodeLiteral): any {
+export function Renderer(parsed_template: NodeNodeList, input_data: InputData, input_settings: InputSettings) {
+	async function NodeList(node: NodeNodeList): Promise<string> {
+		const rendered_nodes: any = [];
+
+		for (const subnode of node.nodes) {
+			rendered_nodes.push(await render_node(subnode));
+		}
+
+		return rendered_nodes.join('');
+	}
+
+	async function Tag(node: NodeTag): Promise<any> {
+		const value = await render_node(node.value);
+
+		if (node.flags) {
+		}
+
+		return value;
+	}
+
+	async function Text(node: NodeText): Promise<string> {
+		const value = node.value;
+
+		if (node.flags) {
+		}
+
+		return value;
+	}
+
+	async function If(node: NodeIf) {
+		const test = await render_node(node.statement.test);
+
+		if (test) {
+			return render_node(node.consequent);
+		} else {
+			if (node.alternate) {
+				return render_node(node.alternate);
+			}
+
+			return '';
+		}
+	}
+
+	async function Else(node: NodeElse) {
+		return render_node(node.value);
+	}
+
+	async function Identifier(node: NodeIdentifier): Promise<any> {
+		return input_data[node.value];
+	}
+
+	async function Literal(node: NodeLiteral): Promise<any> {
 		return node.value;
 	}
 
-	/**** render ****/
-
-	async function render_node(node: TemplateBlock | NodeExpression): Promise<string> {
+	async function render_node(node: Node | NodeNodeList | NodeExpression): Promise<string> {
 		switch (node.type) {
+			case 'NodeList':
+				return NodeList(node);
 			case 'Text':
+				return Text(node);
 			case 'Tag':
-			case 'Import':
+				return Tag(node);
 			case 'If':
+				return If(node);
+			case 'Else':
+				return Else(node);
+			case 'Import':
+				return ''; // @TODO
 			case 'For':
-			case 'CallExpression':
-			case 'MemberExpression':
+				return ''; // @TODO
+			case 'ConditionalExpression':
 			case 'LogicalExpression':
 			case 'BinaryExpression':
-			case 'ConditionalExpression':
 			case 'UnaryExpression':
-			case 'Identifier':
+			case 'CallExpression':
+			case 'MemberExpression':
 				return '--';
+			case 'Identifier':
+				return Identifier(node);
 			case 'StringLiteral':
 			case 'NumericLiteral':
 			case 'BooleanLiteral':
@@ -64,22 +128,9 @@ export function TemplateRenderer(parsed_template: Template, input_data: InputDat
 		}
 	}
 
-	async function render_nodes(node_list: any): Promise<any> {
-		const rendered_nodes: Array<any> = [];
-
-		for (const node of node_list.nodes) {
-			rendered_nodes.push(await render_node(node));
-		}
-
-		return rendered_nodes;
-	}
-
 	async function render(): Promise<string> {
-		const rendered_nodes = await render_nodes(parsed_template);
-		return rendered_nodes.join('');
+		return NodeList(parsed_template);
 	}
-
-	/**** misc ****/
 
 	function return_type(value: any): string {
 		return Object.prototype.toString.call(value).slice(8, -1).toLowerCase();
@@ -109,12 +160,6 @@ export function TemplateRenderer(parsed_template: Template, input_data: InputDat
 	};
 }
 
-type InputTemplate = string;
-type InputData = Record<string, any>;
-type InputSettings = {
-	import_directory: string;
-};
-
 export async function render(
 	input_template: InputTemplate,
 	input_data: InputData = {},
@@ -122,5 +167,5 @@ export async function render(
 		import_directory: '',
 	}
 ) {
-	return TemplateRenderer(parse(input_template), input_data, input_settings).render();
+	return Renderer(parse(input_template), input_data, input_settings).render();
 }
