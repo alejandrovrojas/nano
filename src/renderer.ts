@@ -74,17 +74,78 @@ export function Renderer(parsed_template: NodeNodeList, input_data: InputData, i
 
 		if (test) {
 			return render_node(node.consequent);
-		} else {
-			if (node.alternate) {
-				return render_node(node.alternate);
-			}
-
-			return '';
+		} else if (node.alternate) {
+			return render_node(node.alternate);
 		}
 	}
 
 	async function Else(node: NodeElse) {
 		return render_node(node.value);
+	}
+
+	async function ConditionalExpression(node: NodeConditionalExpression) {
+		const test = await render_node(node.test);
+
+		if (test) {
+			return render_node(node.consequent);
+		} else {
+			return render_node(node.alternate);
+		}
+	}
+
+	async function LogicalExpression(node: NodeLogicalExpression) {
+		const operator = node.operator;
+		const left = await render_node(node.left);
+		const right = await render_node(node.right);
+
+		switch (node.operator) {
+			case '&&':
+				return left && right;
+			case '||':
+				return left || right;
+		}
+	}
+
+	async function BinaryExpression(node: NodeBinaryExpression) {
+		const operator = node.operator;
+		const left: any = await render_node(node.left);
+		const right: any = await render_node(node.right);
+
+		switch (node.operator) {
+			case '!=':
+				return left != right;
+			case '==':
+				return left == right;
+			case '<=':
+				return left <= right;
+			case '>=':
+				return left >= right;
+			case '<':
+				return left < right;
+			case '>':
+				return left > right;
+			case '+':
+				return left + right;
+			case '-':
+				return left - right;
+			case '*':
+				return left * right;
+			case '/':
+				return left / right;
+			default:
+				return ''; /** @NEVER **/
+		}
+	}
+
+	async function UnaryExpression(node: NodeUnaryExpression) {
+		const value = await render_node(node.value);
+
+		switch (node.operator) {
+			case '!':
+				return !value;
+			case '-':
+				return -value;
+		}
 	}
 
 	async function Identifier(node: NodeIdentifier): Promise<any> {
@@ -95,7 +156,7 @@ export function Renderer(parsed_template: NodeNodeList, input_data: InputData, i
 		return node.value;
 	}
 
-	async function render_node(node: Node | NodeNodeList | NodeExpression): Promise<string> {
+	async function render_node(node: Node | NodeNodeList | NodeExpression): Promise<any> {
 		switch (node.type) {
 			case 'NodeList':
 				return NodeList(node);
@@ -108,16 +169,18 @@ export function Renderer(parsed_template: NodeNodeList, input_data: InputData, i
 			case 'Else':
 				return Else(node);
 			case 'Import':
-				return ''; // @TODO
 			case 'For':
-				return ''; // @TODO
-			case 'ConditionalExpression':
-			case 'LogicalExpression':
-			case 'BinaryExpression':
-			case 'UnaryExpression':
 			case 'CallExpression':
 			case 'MemberExpression':
-				return '--';
+				return ''; // @TODO
+			case 'ConditionalExpression':
+				return ConditionalExpression(node);
+			case 'LogicalExpression':
+				return LogicalExpression(node);
+			case 'BinaryExpression':
+				return BinaryExpression(node);
+			case 'UnaryExpression':
+				return UnaryExpression(node);
 			case 'Identifier':
 				return Identifier(node);
 			case 'StringLiteral':
@@ -126,7 +189,7 @@ export function Renderer(parsed_template: NodeNodeList, input_data: InputData, i
 			case 'NullLiteral':
 				return Literal(node);
 			default:
-				return '';
+				return ''; //@NEVER
 		}
 	}
 
