@@ -36,7 +36,7 @@ import type {
 import { Tokenizer } from './tokenizer.ts';
 import { NanoError } from './classes.ts';
 
-function ExpressionParser(input_expression: string) {
+function ExpressionParser(input_expression: string, line_offset = 0) {
 	const expression_tokens: TokenSpecList = [
 		[/^\s+/, null],
 		[/^<!--[\s\S]*?-->/, null],
@@ -79,7 +79,7 @@ function ExpressionParser(input_expression: string) {
 		[/^'[^']*'/, 'STRING'],
 	];
 
-	const tokenizer = Tokenizer(input_expression, expression_tokens);
+	const tokenizer = Tokenizer(input_expression, expression_tokens, line_offset);
 
 	function ImportStatement(): NodeImportStatement {
 		tokenizer.advance('IMPORT');
@@ -535,7 +535,7 @@ function Parser(input_template: string) {
 	function Import(): NodeImport {
 		const token = tokenizer.advance('IMPORT');
 		const expression = token.value.slice(1, -1);
-		const statement = ExpressionParser(expression).import_statement();
+		const statement = ExpressionParser(expression, tokenizer.line() - 1).import_statement();
 
 		return {
 			type: 'Import',
@@ -547,7 +547,7 @@ function Parser(input_template: string) {
 		const token = tokenizer.advance('FOR');
 		const flags = token.value.match(/#|!/g) || [];
 		const expression = token.value.slice(flags.length + 1, -1);
-		const statement = ExpressionParser(expression).for_statement();
+		const statement = ExpressionParser(expression, tokenizer.line() - 1).for_statement();
 		const value = NodeList('FOR_END', flags);
 
 		try {
@@ -566,7 +566,7 @@ function Parser(input_template: string) {
 	function If(token_type: 'IF' | 'ELSEIF' = 'IF'): NodeIf {
 		const token = tokenizer.advance(token_type);
 		const { flags, expression } = handle_statement_tag(token.value);
-		const statement = ExpressionParser(expression).if_statement();
+		const statement = ExpressionParser(expression, tokenizer.line() - 1).if_statement();
 
 		const consequent: NodeNodeList = {
 			type: 'NodeList',
@@ -627,7 +627,7 @@ function Parser(input_template: string) {
 	function Tag(): NodeTag {
 		const token = tokenizer.advance('TAG');
 		const { flags, expression } = handle_statement_tag(token.value);
-		const value = ExpressionParser(expression).expression();
+		const value = ExpressionParser(expression, tokenizer.line() - 1).expression();
 
 		const tag_node: NodeTag = {
 			type: 'Tag',

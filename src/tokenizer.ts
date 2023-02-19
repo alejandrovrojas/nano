@@ -1,8 +1,8 @@
 import type { Token, TokenSpecList } from './types.ts';
 import { NanoError } from './classes.ts';
 
-export function Tokenizer(input_template: string, token_spec: TokenSpecList) {
-	let line = 0;
+export function Tokenizer(input_template: string, token_spec: TokenSpecList, line_offset: number = 0) {
+	let line = line_offset || 1;
 	let cursor = 0;
 	let input = input_template;
 	let next_token = traverse_next_token();
@@ -67,11 +67,11 @@ export function Tokenizer(input_template: string, token_spec: TokenSpecList) {
 
 	function traverse_and_set_token(token_type_match: string | undefined = undefined) {
 		if (next_token === null) {
-			throw new NanoError(`Unexpected end of input (line ${line + 1})`);
+			throw new NanoError(`Unexpected end of input (line ${line})`);
 		}
 
 		if (next_token.type !== token_type_match) {
-			throw new NanoError(`Unexpected token ${next_token.value} (line ${line + 1})`);
+			throw new NanoError(`Unexpected token ${next_token.value} (line ${line})`);
 		}
 
 		const current_token = next_token;
