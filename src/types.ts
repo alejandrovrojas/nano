@@ -25,7 +25,7 @@ export type NodeLiteral =
 	| NodeStringLiteral
 	| NodeNumericLiteral;
 
-export type NodeFlagList = RegExpMatchArray;
+export type NodeFlagList = RegExpMatchArray | [];
 export type TokenSpecList = Array<[RegExp, string | null]>;
 export type TemplateBlockList = TemplateBlock[];
 export type NodeIdentifierList = Array<NodeIdentifier>;
