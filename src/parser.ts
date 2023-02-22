@@ -468,15 +468,15 @@ function Parser(input_template: string) {
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
-		[/^{[#!]{0,2}import [\s\S]*?}/, 'IMPORT'],
+		[/^{[#!]{0,2}[\s]*?import [\s\S]*?}/, 'IMPORT'],
 
-		[/^{[#!]{0,2}if [\s\S]*?}/, 'IF'],
-		[/^{[#!]{0,2}else if [\s\S]*?}/, 'ELSEIF'],
-		[/^{[#!]{0,2}else}/, 'ELSE'],
-		[/^{\/if}/, 'IF_END'],
+		[/^{[#!]{0,2}[\s]*?if [\s\S]*?}/, 'IF'],
+		[/^{[#!]{0,2}[\s]*?else if [\s\S]*?}/, 'ELSEIF'],
+		[/^{[#!]{0,2}[\s]*?else}/, 'ELSE'],
+		[/^{[\s]*?\/if[\s]*?}/, 'IF_END'],
 
-		[/^{[#!]{0,2}for [\s\S]*?}/, 'FOR'],
-		[/^{\/for}/, 'FOR_END'],
+		[/^{[#!]{0,2}[\s]*?for [\s\S]*?}/, 'FOR'],
+		[/^{[\s]*?\/for[\s]*?}/, 'FOR_END'],
 
 		[/^{[#!]{0,2}[\s\S]*?}/, 'TAG'],
 		[/^[\s\S]?/, 'TEXT'],
@@ -533,8 +533,12 @@ function Parser(input_template: string) {
 
 	function Import(): NodeImport {
 		const token = tokenizer.advance('IMPORT');
-		const expression = token.value.slice(1, -1);
+		const { flags, expression } = handle_statement_tag(token.value);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).import_statement();
+
+		if (flags.length > 0) {
+			throw new NanoError(`Flags in {import} blocks are not allowed`);
+		}
 
 		return {
 			type: 'Import',
@@ -544,8 +548,7 @@ function Parser(input_template: string) {
 
 	function For(): NodeFor {
 		const token = tokenizer.advance('FOR');
-		const flags = token.value.match(/#|!/g) || [];
-		const expression = token.value.slice(flags.length + 1, -1);
+		const { flags, expression } = handle_statement_tag(token.value);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).for_statement();
 		const value = BlockList('FOR_END', flags);
 
