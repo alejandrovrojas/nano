@@ -1,11 +1,10 @@
 import type {
 	Token,
-	TokenSpecList,
-	Node,
+	TokenSpec,
+	NodeBlock,
 	NodeExpression,
 	NodeLiteral,
-	NodeNodeList,
-	NodeList,
+	NodeBlockList,
 	NodeText,
 	NodeTag,
 	NodeFlagList,
@@ -37,7 +36,7 @@ import { Tokenizer } from './tokenizer.ts';
 import { NanoError } from './classes.ts';
 
 function ExpressionParser(input_expression: string, line_offset = 0) {
-	const expression_tokens: TokenSpecList = [
+	const expression_tokens: TokenSpec = [
 		[/^\s+/, null],
 		[/^<!--[\s\S]*?-->/, null],
 
@@ -145,7 +144,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 
 		return {
 			type: 'ForStatement',
-			identifiers,
+			identifiers: identifiers.map((node: NodeIdentifier) => node.value),
 			iterator,
 		};
 	}
@@ -465,7 +464,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 }
 
 function Parser(input_template: string) {
-	const template_tokens: TokenSpecList = [
+	const template_tokens: TokenSpec = [
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
@@ -486,10 +485,10 @@ function Parser(input_template: string) {
 	const tokenizer = Tokenizer(input_template, template_tokens);
 
 	function parse() {
-		return NodeList();
+		return BlockList();
 	}
 
-	function parse_token(token_type: string | undefined): Node | null {
+	function parse_token(token_type: string | undefined): NodeBlock | null {
 		switch (token_type) {
 			case 'IMPORT':
 				return Import();
@@ -510,8 +509,8 @@ function Parser(input_template: string) {
 		}
 	}
 
-	function NodeList(token_type_limit: string | undefined = undefined, flags: NodeFlagList = []): NodeNodeList {
-		const node_list: NodeList = [];
+	function BlockList(token_type_limit: string | undefined = undefined, flags: NodeFlagList = []): NodeBlockList {
+		const node_list: NodeBlock[] = [];
 
 		while (tokenizer.next() && tokenizer.next()?.type !== token_type_limit) {
 			const next_type = tokenizer.next()?.type || '';
@@ -527,7 +526,7 @@ function Parser(input_template: string) {
 		}
 
 		return {
-			type: 'NodeList',
+			type: 'BlockList',
 			nodes: node_list,
 		};
 	}
@@ -548,7 +547,7 @@ function Parser(input_template: string) {
 		const flags = token.value.match(/#|!/g) || [];
 		const expression = token.value.slice(flags.length + 1, -1);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).for_statement();
-		const value = NodeList('FOR_END', flags);
+		const value = BlockList('FOR_END', flags);
 
 		try {
 			tokenizer.advance('FOR_END');
@@ -568,8 +567,8 @@ function Parser(input_template: string) {
 		const { flags, expression } = handle_statement_tag(token.value);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).if_statement();
 
-		const consequent: NodeNodeList = {
-			type: 'NodeList',
+		const consequent: NodeBlockList = {
+			type: 'BlockList',
 			nodes: [],
 		};
 
@@ -620,7 +619,7 @@ function Parser(input_template: string) {
 
 		return {
 			type: 'Else',
-			value: NodeList('IF_END', flags),
+			value: BlockList('IF_END', flags),
 		};
 	}
 
