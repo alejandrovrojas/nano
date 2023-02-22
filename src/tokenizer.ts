@@ -1,7 +1,7 @@
-import type { Token, TokenSpecList } from './types.ts';
+import type { Token, TokenSpec } from './types.ts';
 import { NanoError } from './classes.ts';
 
-export function Tokenizer(input_template: string, token_spec: TokenSpecList, line_offset: number = 0) {
+export function Tokenizer(input_template: string, token_spec: TokenSpec, line_offset: number = 0) {
 	let line = line_offset || 1;
 	let cursor = 0;
 	let input = input_template;

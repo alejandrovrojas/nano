@@ -7,10 +7,15 @@ export type Token = {
 	value: string;
 };
 
-export type TokenSpecList = Array<[RegExp, string | null]>;
+export type TokenSpec = Array<[RegExp, string | null]>;
 
 /* prettier-ignore */
 export type Node =
+	| NodeBlock
+	| NodeExpression
+
+/* prettier-ignore */
+export type NodeBlock =
 	| NodeImport
 	| NodeIf
 	| NodeElse
@@ -36,12 +41,10 @@ export type NodeLiteral =
 	| NodeStringLiteral
 	| NodeNumericLiteral;
 
-export type NodeNodeList = {
-	type: 'NodeList';
-	nodes: NodeList;
+export type NodeBlockList = {
+	type: 'BlockList';
+	nodes: NodeBlock[];
 };
-
-export type NodeList = Node[];
 
 export type NodeText = {
 	type: 'Text';
@@ -79,7 +82,7 @@ export type NodeImportStatementArgumentList = NodeImportStatementArgument[];
 export type NodeIf = {
 	type: 'If';
 	statement: NodeIfStatement;
-	consequent: NodeNodeList;
+	consequent: NodeBlockList;
 	alternate: NodeIf | NodeElse | null;
 };
 
@@ -90,18 +93,18 @@ export type NodeIfStatement = {
 
 export type NodeElse = {
 	type: 'Else';
-	value: NodeNodeList;
+	value: NodeBlockList;
 };
 
 export type NodeFor = {
 	type: 'For';
 	statement: NodeForStatement;
-	value: NodeNodeList;
+	value: NodeBlockList;
 };
 
 export type NodeForStatement = {
 	type: 'ForStatement';
-	identifiers: NodeIdentifierList;
+	identifiers: string[];
 	iterator: NodeExpression;
 };
 
