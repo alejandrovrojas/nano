@@ -37,6 +37,7 @@ import type {
 } from './types.ts';
 
 import { parse } from './parser.ts';
+import { join as join_path, isAbsolute as is_path_absolute } from 'https://deno.land/std@0.165.0/path/mod.ts';
 
 export function Renderer(input_template_parsed: NodeBlockList, input_data: InputData, input_settings: InputSettings) {
 	async function BlockList(node: NodeBlockList, node_data?: InputData): Promise<string> {
@@ -45,7 +46,38 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 	}
 
 	async function Import(node: NodeImport, node_data?: InputData) {
-		return '';
+		const import_path = await render_node(node.statement.path, node_data);
+		const import_path_prefixed = is_path_absolute(import_path)
+			? import_path
+			: join_path(input_settings.import_directory, import_path);
+
+		try {
+			//@ts-ignore
+			const import_context = node_data || input_data;
+			const imported_file = import_context[import_path] || (await Deno.readTextFile(import_path_prefixed));
+
+			const import_data = { ...import_context };
+			const import_settings = { ...input_settings };
+
+			/**
+			 * @TODO render "with" pairs as individual nodes
+			 * */
+
+			for (const pair of node.statement.with) {
+				const key = pair.key;
+				const value = await render_node(pair.value, import_context);
+
+				import_data[key] = value;
+			}
+
+			return render_node(parse(imported_file), import_data);
+		} catch (error) {
+			if (error.name === 'NotFound') {
+				throw new Error(`Imported file "${import_path}" could not be found.`);
+			}
+
+			throw error;
+		}
 	}
 
 	async function For(node: NodeFor, node_data?: InputData) {
