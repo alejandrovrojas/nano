@@ -60,7 +60,12 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 			const import_settings = { ...input_settings };
 
 			/**
-			 * @TODO render "with" pairs as individual nodes
+			 * 	@NOTE render "with" pairs as individual nodes and/or
+			 * 	refactor argument lists as a generic node type.
+			 * 	direct access to the pair values is nevertheless not
+			 * 	all that bad when the node object is type safe
+			 *
+			 * 	@SEE CallExpression()
 			 * */
 
 			for (const pair of node.statement.with) {
@@ -108,8 +113,9 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 		const [iterator_index_key_name, iterator_value_name] = node.statement.identifiers;
 
 		/**
-		 * @NOTE this method should throw if the iterator
-		 * is undefined
+		 * 	@NOTE this method should probably throw an error if
+		 * 	the iterator is undefined? there is no real reason to
+		 * 	fail silently when the iterator is not iterable
 		 * */
 
 		if (iterator) {
