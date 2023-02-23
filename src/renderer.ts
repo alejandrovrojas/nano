@@ -60,7 +60,7 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 			const import_settings = { ...input_settings };
 
 			/**
-			 * 	@NOTE render "with" pairs as individual nodes and/or
+			 * 	@YAGNI render "with" pairs as individual nodes and/or
 			 * 	refactor argument lists as a generic node type.
 			 * 	direct access to the pair values is nevertheless not
 			 * 	all that bad when the node object is type safe
@@ -113,7 +113,7 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 		const [iterator_index_key_name, iterator_value_name] = node.statement.identifiers;
 
 		/**
-		 * 	@NOTE this method should probably throw an error if
+		 * 	@TODO this method should probably throw an error if
 		 * 	the iterator is undefined? there is no real reason to
 		 * 	fail silently when the iterator is not iterable
 		 * */
