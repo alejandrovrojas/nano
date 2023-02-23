@@ -533,12 +533,8 @@ function Parser(input_template: string) {
 
 	function Import(): NodeImport {
 		const token = tokenizer.advance('IMPORT');
-		const { flags, expression } = handle_statement_tag(token.value);
+		const expression = token.value.slice(1, -1);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).import_statement();
-
-		if (flags.length > 0) {
-			throw new NanoError(`Flags in {import} blocks are not allowed`);
-		}
 
 		return {
 			type: 'Import',
