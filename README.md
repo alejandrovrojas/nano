@@ -148,8 +148,8 @@ Before reading a file from disk, the renderer will look for a matching template 
 
 ---
 
-### If/for block flags
-Blocks can be flagged with `!` or `#` (or both) for removing whitespace around HTML tags or escape reserved HTML characters respectively.
+### Flags
+If/for/expression blocks can be flagged with `!` or `#` (or both) for removing whitespace around HTML tags or escape reserved HTML characters respectively.
 
 #### Remove whitespace `{!...}`
 In this example (with whitespace added for clarity), the following `{for}`
