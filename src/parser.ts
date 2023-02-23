@@ -468,7 +468,7 @@ function Parser(input_template: string) {
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
-		[/^{[#!]{0,2}[\s]*?import [\s\S]*?}/, 'IMPORT'],
+		[/^{[\s]*?import [\s\S]*?}/, 'IMPORT'],
 
 		[/^{[#!]{0,2}[\s]*?if [\s\S]*?}/, 'IF'],
 		[/^{[#!]{0,2}[\s]*?else if [\s\S]*?}/, 'ELSEIF'],
