@@ -140,7 +140,7 @@ export type NodeUnaryExpression = {
 export type NodeMemberExpression = {
 	type: 'MemberExpression';
 	object: NodeExpression;
-	property: NodeExpression;
+	property: NodeIdentifier;
 };
 
 export type NodeCallExpression = {

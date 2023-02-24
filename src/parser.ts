@@ -289,7 +289,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 			if (tokenizer.next()?.type === 'DOT') {
 				tokenizer.advance('DOT');
 
-				const property = MemberExpression();
+				const property = Identifier();
 
 				object = {
 					type: 'MemberExpression',
