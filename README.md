@@ -77,31 +77,31 @@ _Result_
 
 ```html
 {for item in array_like}
-	<div>{ item }</div>
+	<div>{item}</div>
 {/for}
 ```
 
 ```html
 {for item, index in array_like}
-	<div>{ item }</div>
+	<div>{item}</div>
 {/for}
 ```
 
 ```html
 {for key, value in object_like}
-	<div>{ item }</div>
+	<div>{item}</div>
 {/for}
 ```
 
 ```html
 {for character, index in "hello"}
-	<div>{ character }</div>
+	<div>{character}</div>
 {/for}
 ```
 
 ```html
 {for number, index in 10}
-	<div>{ number - 1 } equals { index }</div>
+	<div>{number - 1} equals {index}</div>
 {/for}
 ```
 
@@ -116,7 +116,7 @@ The imported module will have access to the same data accessible to the scope it
 ```html
 <!-- list.html -->
 {for fruit in fruits}
-	{ import 'list_item.html' }
+	{import 'list_item.html'}
 {/for}
 
 <!-- list_item.html -->
@@ -128,7 +128,7 @@ It's also possible to define/rewrite variables using the `with` keyword along wi
 ```html
 <!-- list.html -->
 {for fruit, index in fruits}
-	{ import 'list_item.html' with (number: index + 1, other: "thing") }
+	{import 'list_item.html' with (number: index + 1, other: "thing")}
 {/for}
 
 <!-- list_item.html -->
@@ -136,7 +136,7 @@ It's also possible to define/rewrite variables using the `with` keyword along wi
 ```
 Before reading a file from disk, the renderer will look for a matching template inside the data object first. If an object key matches the import path, the string value will be loaded as a template. 
 ```html
-{ import 'my_block.html' }
+{import 'my_block.html'}
 ```
 ```js
 // data
@@ -156,7 +156,7 @@ In this example (with whitespace added for clarity), the following `{for}`
 
 ```html
 {for number in 10} ↩
-	⇥ <span>{ number }</span> ↩
+	⇥ <span>{number}</span> ↩
 {/for}
 ```
 
@@ -174,7 +174,7 @@ however `{!for}`
 
 ```html
 {!for number in 10} ↩
-	⇥ <span>{ number }</span> ↩
+	⇥ <span>{number}</span> ↩
 {/for}
 ```
 
