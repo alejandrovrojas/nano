@@ -265,7 +265,7 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 	}
 
 	async function render_nodes(node_list: Node[], node_data?: InputData) {
-		const rendered_nodes = [];
+		const rendered_nodes: Node[] = [];
 
 		for (const node of node_list) {
 			rendered_nodes.push(await render_node(node, node_data));
