@@ -45,7 +45,6 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 			const imported_file = import_context[import_path] || (await Deno.readTextFile(import_path_prefixed));
 
 			const import_data = { ...import_context };
-			const import_settings = { ...input_settings };
 
 			/**
 			 * 	@YAGNI render "with" pairs as individual nodes and/or
@@ -109,7 +108,6 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 		if (iterator) {
 			for (const [loop_index_key, loop_value] of iterator) {
 				const block_input_data = { ...input_data };
-				const block_input_settings = { ...input_settings };
 
 				if (iterator_index_key_name) {
 					block_input_data[iterator_index_key_name] = loop_index_key;
@@ -185,7 +183,6 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 	}
 
 	async function LogicalExpression(node: NodeLogicalExpression, node_data?: InputData) {
-		const operator = node.operator;
 		const left = await render_node(node.left, node_data);
 		const right = await render_node(node.right, node_data);
 
@@ -198,7 +195,6 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 	}
 
 	async function BinaryExpression(node: NodeBinaryExpression, node_data?: InputData) {
-		const operator = node.operator;
 		const left: any = await render_node(node.left, node_data);
 		const right: any = await render_node(node.right, node_data);
 
