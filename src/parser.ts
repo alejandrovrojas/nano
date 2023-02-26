@@ -271,8 +271,6 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 		 * 	at some point, also in relation to PrimaryExpression().
 		 * 	as of now it's not possible to chain method calls'
 		 * 	member expressions e.g. something().like().this() though
-		 * 	(at least as far as i know) this is partly a technical
-		 * 	limitation of this type of parser
 		 * */
 		const member_expression = MemberExpression();
 
@@ -346,17 +344,6 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 	}
 
 	function PrimaryExpression() {
-		/**
-		 * 	@NOTE	this should be refactored at some point.
-		 * 	using Literal as the default switch allows
-		 * 	member expressions using literal values
-		 * 	e.g. something.2.like."this" which is somewhat
-		 * 	unexpected when the rest of the syntax
-		 * 	otherwise looks like a subset of javascript.
-		 * 	also, this parser already supports property
-		 * 	access using a bracket syntax, so supporting
-		 * 	both methods is inconsistent and unexpected
-		 * */
 		switch (tokenizer.next()?.type) {
 			case 'L_PARENTHESIS':
 				return ParenthesisExpression();
