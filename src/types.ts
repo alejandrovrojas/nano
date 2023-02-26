@@ -30,6 +30,7 @@ export type NodeExpression =
 	| NodeBinaryExpression
 	| NodeUnaryExpression
 	| NodeMemberExpression
+	| NodeMemberBracketExpression
 	| NodeCallExpression
 	| NodeIdentifier
 	| NodeLiteral;
@@ -141,6 +142,12 @@ export type NodeMemberExpression = {
 	type: 'MemberExpression';
 	object: NodeExpression;
 	property: NodeIdentifier;
+};
+
+export type NodeMemberBracketExpression = {
+	type: 'MemberBracketExpression';
+	object: NodeExpression;
+	property: NodeExpression;
 };
 
 export type NodeCallExpression = {
