@@ -385,7 +385,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 			case 'NUMBER':
 				return NumericLiteral();
 			default:
-				throw new NanoError(`Unknown tag {${tokenizer.input()}}`);
+				throw new NanoError(`Unknown tag {${tokenizer.input()}} (line: ${tokenizer.line()})`);
 		}
 	}
 
