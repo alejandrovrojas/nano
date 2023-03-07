@@ -40,7 +40,6 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 			: join_path(input_settings.import_directory, import_path);
 
 		try {
-			//@ts-ignore
 			const import_data = node_data || input_data;
 			const imported_file = import_data[import_path] || (await Deno.readTextFile(import_path_prefixed));
 
