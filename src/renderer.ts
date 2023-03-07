@@ -40,7 +40,8 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 			: join_path(input_settings.import_directory, import_path);
 
 		try {
-			const import_data = node_data || input_data;
+			const import_context = node_data || input_data;
+			const import_data = { ...import_context };
 			const imported_file = import_data[import_path] || (await Deno.readTextFile(import_path_prefixed));
 
 			/**
@@ -72,7 +73,8 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 	async function For(node: NodeFor, node_data?: InputData) {
 		const iterator_value = await render_node(node.statement.iterator, node_data);
 		const iterator_type = return_type(iterator_value);
-		const iterator_data = node_data || input_data;
+		const iterator_context = node_data || input_data;
+		const iterator_data = { ...iterator_context };
 
 		let iterator: Array<[any, number]> | null = null;
 		let iterator_output: string = '';
@@ -232,7 +234,8 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 	}
 
 	async function Identifier(node: NodeIdentifier, node_data?: InputData): Promise<any> {
-		const identifier_data = node_data || input_data;
+		const identifier_context = node_data || input_data;
+		const identifier_data = { ...identifier_context };
 		return identifier_data[node.value];
 	}
 
