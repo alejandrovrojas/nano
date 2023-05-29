@@ -45,7 +45,7 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 			const imported_file = import_data[import_path] || (await Deno.readTextFile(import_path_prefixed));
 
 			/**
-			 * 	@YAGNI render "with" pairs as individual nodes and/or
+			 * 	@NOTE render "with" pairs as individual nodes and/or
 			 * 	refactor argument lists as a generic node type.
 			 * 	direct access to the pair values is nevertheless not
 			 * 	all that bad when the node object is type safe

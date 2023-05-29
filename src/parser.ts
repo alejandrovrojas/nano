@@ -38,9 +38,8 @@ import { NanoError } from './classes.ts';
 
 function ExpressionParser(input_expression: string, line_offset = 0) {
 	/**
-	 * 	@TODO consider excluding keywords that are already
+	 * 	@NOTE consider excluding keywords that are already
 	 * 	handled by the template parser such as if, for, else.
-	 * 	and allow them to be handled as identifiers
 	 * */
 
 	const expression_tokens: TokenSpec = [
@@ -143,7 +142,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 		const iterator = Expression();
 
 		/**
-		 * 	@YAGNI consider throwing if identifiers.length > 2
+		 * 	@NOTE consider throwing if identifiers.length > 2
 		 * 	because the allowed syntax by the interpreter is either
 		 * 	{for a in x} or {for a, b in x} where a, b equals to
 		 * 	value, index or key, value depending on the iterator
@@ -651,7 +650,7 @@ function TemplateParser(input_template: string) {
 		const expression = raw_string.slice(flags.length);
 
 		/**
-		 * 	@YAGNI consider throwing a syntax error in case of
+		 * 	@NOTE consider throwing a syntax error in case of
 		 * 	duplicate flags or in case an unknown character
 		 * 	is used (for whatever reason)
 		 * */
