@@ -130,8 +130,8 @@ export type NodeLogicalExpression = {
 export type NodeBinaryExpression = {
 	type: 'BinaryExpression';
 	operator: string;
-	left: NodeBinaryExpression | NodeUnaryExpression;
-	right: NodeBinaryExpression | NodeUnaryExpression;
+	left: NodeExpression;
+	right: NodeExpression;
 };
 
 export type NodeUnaryExpression = {
