@@ -1,7 +1,7 @@
 {
 	"tasks": {
-		"render": "deno run --allow-all --check tests/render.ts",
-		"parse": "deno run --allow-all --check tests/parse.ts",
-		"test": "deno test --allow-all tests/test.ts"
+		"render": "deno run --allow-all --check tests/test_print_rendered.ts",
+		"parse": "deno run --allow-all --check tests/test_print_parsed.ts",
+		"test": "deno test --allow-all tests/test_check_ast.ts"
 	}
 }

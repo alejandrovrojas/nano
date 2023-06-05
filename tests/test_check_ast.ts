@@ -11,8 +11,26 @@ import { assertEquals } from 'https://deno.land/std/testing/asserts.ts';
 
 const tests: Test[] = [
 	{
+		name: 'expression',
+		input: `{2 + 2}`,
+		parsed: {
+			type: 'BlockList',
+			nodes: [
+				{
+					type: 'Tag',
+					value: {
+						type: 'BinaryExpression',
+						operator: '+',
+						left: { type: 'NumericLiteral', value: 2 },
+						right: { type: 'NumericLiteral', value: 2 },
+					},
+				},
+			],
+		},
+	},
+	{
 		name: 'if else',
-		input: `{if this} A {else} B {/if}`,
+		input: `{if this}A{else}B{/if}`,
 		parsed: {
 			type: 'BlockList',
 			nodes: [
@@ -25,10 +43,16 @@ const tests: Test[] = [
 							value: 'this',
 						},
 					},
-					consequent: [{ type: 'Text', value: ' A ' }],
+					consequent: {
+						type: 'BlockList',
+						nodes: [{ type: 'Text', value: 'A' }],
+					},
 					alternate: {
 						type: 'Else',
-						value: [{ type: 'Text', value: ' B ' }],
+						value: {
+							type: 'BlockList',
+							nodes: [{ type: 'Text', value: 'B' }],
+						},
 					},
 				},
 			],
@@ -38,6 +62,6 @@ const tests: Test[] = [
 
 for (const test of tests) {
 	Deno.test('>> ' + test.name, () => {
-		assertEquals(parse(test.input), test.parsed);
+		assertEquals(test.parsed, parse(test.input));
 	});
 }
