@@ -71,7 +71,7 @@ export function Tokenizer(input_template: string, token_spec: TokenSpec, line_of
 		}
 
 		if (next_token.type !== token_type_match) {
-			throw new NanoError(`Unexpected token ${next_token.value} (line ${line})`);
+			throw new NanoError(`Unexpected token ${token_type_match} ${next_token.value} (line ${line})`);
 		}
 
 		const current_token = next_token;
