@@ -526,8 +526,6 @@ function TemplateParser(input_template: string) {
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
-		[/^{[\s]*?import [\s\S]*?}/, 'IMPORT'],
-
 		[/^{[#!]{0,2}[\s]*?if [\s\S]*?}/, 'IF'],
 		[/^{[#!]{0,2}[\s]*?else if [\s\S]*?}/, 'ELSEIF'],
 		[/^{[#!]{0,2}[\s]*?else}/, 'ELSE'],
@@ -536,6 +534,11 @@ function TemplateParser(input_template: string) {
 		[/^{[#!]{0,2}[\s]*?for [\s\S]*?}/, 'FOR'],
 		[/^{[\s]*?\/for[\s]*?}/, 'FOR_END'],
 
+		[/^{[\s]*?extend [\s\S]*?}/, 'EXTEND'],
+		[/^{[\s]*?\/extend[\s]*?}/, 'EXTEND_END'],
+
+		[/^{[\s]*?import [\s\S]*?}/, 'IMPORT'],
+		[/^{[\s]*?insert [\s\S]*?}/, 'INSERT'],
 		[/^{[#!]{0,2}[\s\S]*?}/, 'TAG'],
 		[/^[\s\S]?/, 'TEXT'],
 	];
