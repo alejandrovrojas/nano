@@ -653,7 +653,7 @@ function TemplateParser(input_template: string) {
 
 		return {
 			type: 'Import',
-			statement,
+			statement: statement,
 		};
 	}
 
@@ -671,8 +671,8 @@ function TemplateParser(input_template: string) {
 
 		return {
 			type: 'For',
-			statement,
-			value,
+			statement: statement,
+			value: value,
 		};
 	}
 
@@ -717,9 +717,9 @@ function TemplateParser(input_template: string) {
 
 		return {
 			type: 'If',
-			statement,
-			consequent,
-			alternate,
+			statement: statement,
+			consequent: consequent,
+			alternate: alternate,
 		};
 	}
 
@@ -744,7 +744,7 @@ function TemplateParser(input_template: string) {
 
 		const tag_node: NodeTag = {
 			type: 'Tag',
-			value,
+			value: value,
 		};
 
 		if (flags.length > 0) {
@@ -787,13 +787,13 @@ function TemplateParser(input_template: string) {
 		 * */
 
 		return {
-			flags,
-			expression,
+			flags: flags,
+			expression: expression,
 		};
 	}
 
 	return {
-		parse,
+		parse: parse,
 	};
 }
 
