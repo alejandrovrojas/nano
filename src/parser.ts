@@ -59,6 +59,9 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 		[/^\,/, 'COMMA'],
 		[/^\./, 'DOT'],
 
+		[/^\bsection\b/, 'SECTION'],
+		[/^\binsert\b/, 'INSERT'],
+		[/^\bextend\b/, 'EXTEND'],
 		[/^\bimport\b/, 'IMPORT'],
 		[/^\bwith\b/, 'WITH'],
 		[/^\bfor\b/, 'FOR'],
@@ -89,6 +92,47 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 	];
 
 	const tokenizer = Tokenizer(input_expression, expression_tokens, line_offset);
+
+	function SectionStatement(): NodeInsertStatement {
+		return {
+			type: 'InsertStatement',
+			name: '???',
+		};
+	}
+
+	function InsertStatement(): NodeInsertStatement {
+		tokenizer.advance('INSERT');
+		const section_name = Identifier();
+
+		return {
+			type: 'InsertStatement',
+			name: section_name.value,
+		};
+	}
+
+	function ExtendStatement(): NodeImportStatement {
+		tokenizer.advance('EXTEND');
+
+		const import_path = Expression();
+		const import_with: NodeImportStatementArgumentList = [];
+
+		if (tokenizer.next() && tokenizer.next()?.type === 'WITH') {
+			tokenizer.advance('WITH');
+			tokenizer.advance('L_PARENTHESIS');
+
+			do {
+				import_with.push(ImportStatementArgument());
+			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
+
+			tokenizer.advance('R_PARENTHESIS');
+		}
+
+		return {
+			type: 'ImportStatement',
+			path: import_path,
+			with: import_with,
+		};
+	}
 
 	function ImportStatement(): NodeImportStatement {
 		tokenizer.advance('IMPORT');
@@ -444,6 +488,9 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 	}
 
 	return {
+		section_statement: SectionStatement,
+		insert_statement: InsertStatement,
+		extend_statement: ExtendStatement,
 		import_statement: ImportStatement,
 		if_statement: IfStatement,
 		for_statement: ForStatement,
