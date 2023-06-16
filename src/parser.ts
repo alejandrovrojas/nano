@@ -499,6 +499,29 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 }
 
 function TemplateParser(input_template: string) {
+	const template_tokens_strict: TokenSpec = [
+		[/^<!--[\s\S]*?-->/, null],
+		[/^<(style|script).*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
+
+		[/^{import .+}/, 'IMPORT'],
+		[/^{insert .+}/, 'INSERT'],
+		[/^{extend .+}/, 'EXTEND'],
+
+		[/^{[#!]{0,2}if .+}/, 'IF'],
+		[/^{[#!]{0,2}else if .+}/, 'ELSEIF'],
+		[/^{[#!]{0,2}else}/, 'ELSE'],
+		[/^{[#!]{0,2}for .+}/, 'FOR'],
+		[/^{[#!]{0,2}section .+}/, 'SECTION'],
+
+		[/^{\/if}/, 'IF_END'],
+		[/^{\/for}/, 'FOR_END'],
+		[/^{\/extend}/, 'EXTEND_END'],
+		[/^{\/section}/, 'SECTION_END'],
+
+		[/^{[#!]{0,2}.*?}/, 'TAG'],
+		[/^[\s\S]?/, 'TEXT'],
+	];
+
 	const template_tokens: TokenSpec = [
 		[/^<!--[\s\S]*?-->/, null],
 		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
@@ -517,7 +540,7 @@ function TemplateParser(input_template: string) {
 		[/^[\s\S]?/, 'TEXT'],
 	];
 
-	const tokenizer = Tokenizer(input_template, template_tokens);
+	const tokenizer = Tokenizer(input_template, template_tokens_strict);
 
 	function parse() {
 		return BlockList();
