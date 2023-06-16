@@ -645,7 +645,7 @@ function TemplateParser(input_template: string) {
 
 	function Import(): NodeImport {
 		const token = tokenizer.advance('IMPORT');
-		const expression = token.value.slice(1, -1);
+		const { expression } = handle_statement_tag(token.value);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).import_statement();
 
 		return {
