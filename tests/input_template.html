@@ -1,3 +1,16 @@
-{for n in 10}
-	<div>{import "tests/import.html" with (nn: n + 10, half: n > 5)}</div>
-{/for}
+<collapsible-block>
+	<div class="collapsible__title">{title}</div>
+	<div class="collapsible__content">
+		{insert default}
+	</div>
+</collapsible-block>
+
+{extend 'collapsible.html' with (title: 'Hello')}
+	<div>
+		...
+	</div>
+
+	<!-- {section content}
+		<content>{title}</content>
+	{/section} -->
+{/extend}
