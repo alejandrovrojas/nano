@@ -478,6 +478,12 @@ function TemplateParser(input_template: string) {
 
 	function parse_token(token_type: string | undefined): NodeBlock | null {
 		switch (token_type) {
+			case 'SECTION':
+				return Section();
+			case 'EXTEND':
+				return Extend();
+			case 'INSERT':
+				return Insert();
 			case 'IMPORT':
 				return Import();
 			case 'IF':
@@ -495,6 +501,54 @@ function TemplateParser(input_template: string) {
 			default:
 				return Skip();
 		}
+	}
+
+	function Section(): NodeSection {
+		const token = tokenizer.advance('SECTION');
+		const expression = token.value.slice(1, -1);
+		const blocks = BlockList('SECTION_END');
+
+		try {
+			tokenizer.advance('SECTION_END');
+		} catch (error) {
+			throw new NanoError(`Missing {/section} closing tag (line ${tokenizer.line()})`);
+		}
+
+		return {
+			type: 'Section',
+			name: 'sss',
+			blocks: blocks,
+		};
+	}
+
+	function Extend(): NodeExtend {
+		const token = tokenizer.advance('EXTEND');
+		const { expression } = handle_statement_tag(token.value);
+		const statement = ExpressionParser(expression, tokenizer.line() - 1).extend_statement();
+		const blocks = BlockList('EXTEND_END');
+
+		try {
+			tokenizer.advance('EXTEND_END');
+		} catch (error) {
+			throw new NanoError(`Missing {/extend} closing tag (line ${tokenizer.line()})`);
+		}
+
+		return {
+			type: 'Extend',
+			statement: statement,
+			blocks: blocks,
+		};
+	}
+
+	function Insert(): NodeInsert {
+		const token = tokenizer.advance('INSERT');
+		const { expression } = handle_statement_tag(token.value);
+		const statement = ExpressionParser(expression, tokenizer.line() - 1).insert_statement();
+
+		return {
+			type: 'Insert',
+			statement: statement,
+		};
 	}
 
 	function BlockList(token_type_limit: string | undefined = undefined, flags: NodeFlagList = []): NodeBlockList {
