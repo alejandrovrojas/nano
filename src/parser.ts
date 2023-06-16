@@ -33,8 +33,9 @@ import type {
 	NodeNumericLiteral,
 	NodeInsert,
 	NodeInsertStatement,
-	NodeExtend,
 	NodeSection,
+	NodeSectionStatement,
+	NodeExtend,
 } from './types.ts';
 
 import { Tokenizer } from './tokenizer.ts';
@@ -93,10 +94,13 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 
 	const tokenizer = Tokenizer(input_expression, expression_tokens, line_offset);
 
-	function SectionStatement(): NodeInsertStatement {
+	function SectionStatement(): NodeSectionStatement {
+		tokenizer.advance('SECTION');
+		const section_name = Identifier();
+
 		return {
-			type: 'InsertStatement',
-			name: '???',
+			type: 'SectionStatement',
+			name: section_name.value,
 		};
 	}
 
@@ -578,7 +582,8 @@ function TemplateParser(input_template: string) {
 
 	function Section(): NodeSection {
 		const token = tokenizer.advance('SECTION');
-		const expression = token.value.slice(1, -1);
+		const { expression } = handle_statement_tag(token.value);
+		const statement = ExpressionParser(expression, tokenizer.line() - 1).section_statement();
 		const blocks = BlockList('SECTION_END');
 
 		try {
@@ -589,7 +594,7 @@ function TemplateParser(input_template: string) {
 
 		return {
 			type: 'Section',
-			name: 'sss',
+			statement: statement,
 			blocks: blocks,
 		};
 	}

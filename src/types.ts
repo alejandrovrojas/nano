@@ -49,9 +49,14 @@ export type NodeLiteral =
 
 export type NodeSection = {
 	type: 'Section';
-	name: string;
+	statement: NodeSectionStatement;
 	blocks: NodeBlockList;
 };
+
+export type NodeSectionStatement = {
+	type: 'SectionStatement';
+	name: string;
+}
 
 export type NodeExtend = {
 	type: 'Extend';
