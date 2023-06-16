@@ -18,6 +18,9 @@ export type Node =
 
 /* prettier-ignore */
 export type NodeBlock =
+	| NodeSection
+	| NodeExtend
+	| NodeInsert
 	| NodeImport
 	| NodeIf
 	| NodeElse
@@ -43,6 +46,28 @@ export type NodeLiteral =
 	| NodeNullLiteral
 	| NodeStringLiteral
 	| NodeNumericLiteral;
+
+export type NodeSection = {
+	type: 'Section';
+	name: string;
+	blocks: NodeBlockList;
+};
+
+export type NodeExtend = {
+	type: 'Extend';
+	statement: NodeImportStatement;
+	blocks: NodeBlockList;
+};
+
+export type NodeInsert = {
+	type: 'Insert';
+	statement: NodeInsertStatement;
+};
+
+export type NodeInsertStatement = {
+	type: 'InsertStatement';
+	name: string;
+};
 
 export type NodeBlockList = {
 	type: 'BlockList';

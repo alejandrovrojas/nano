@@ -31,6 +31,10 @@ import type {
 	NodeNullLiteral,
 	NodeStringLiteral,
 	NodeNumericLiteral,
+	NodeInsert,
+	NodeInsertStatement,
+	NodeExtend,
+	NodeSection,
 } from './types.ts';
 
 import { Tokenizer } from './tokenizer.ts';
