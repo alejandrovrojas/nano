@@ -311,7 +311,7 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 			case 'NullLiteral':
 				return Literal(node);
 			default:
-				return ''; // @NEVER
+				return '';
 		}
 	}
 
