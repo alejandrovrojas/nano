@@ -453,6 +453,8 @@ function TemplateParser(input_template: string) {
 		[/^<(style|script).*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
 		[/^{import .+}/, 'IMPORT'],
+		[/^{switch .+}/, 'SWITCH'],
+		[/^{case .+}/, 'CASE'],
 
 		[/^{[#!]{0,2}if .+}/, 'IF'],
 		[/^{[#!]{0,2}else if .+}/, 'ELSEIF'],
@@ -461,6 +463,8 @@ function TemplateParser(input_template: string) {
 
 		[/^{\/if}/, 'IF_END'],
 		[/^{\/for}/, 'FOR_END'],
+		[/^{\/switch}/, 'SWITCH_END'],
+		[/^{\/case}/, 'CASE_END'],
 
 		[/^{[#!]{0,2}.*?}/, 'TAG'],
 		[/^[\s\S]?/, 'TEXT'],
