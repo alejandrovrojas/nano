@@ -1,3 +1,13 @@
-{for n in 10}
-	<div>{import "tests/import.html" with (nn: n + 10, half: n > 5)}</div>
-{/for}
+{switch some.value}
+	{case "a"}
+		A
+	{/case}
+
+	{case 20}
+		B
+	{/case}
+
+	{default}
+		C
+	{/default}
+{/switch}
