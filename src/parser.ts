@@ -450,19 +450,19 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 function TemplateParser(input_template: string) {
 	const template_tokens: TokenSpec = [
 		[/^<!--[\s\S]*?-->/, null],
-		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
+		[/^<(style|script).*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
-		[/^{[\s]*?import [\s\S]*?}/, 'IMPORT'],
+		[/^{import .+}/, 'IMPORT'],
 
-		[/^{[#!]{0,2}[\s]*?if [\s\S]*?}/, 'IF'],
-		[/^{[#!]{0,2}[\s]*?else if [\s\S]*?}/, 'ELSEIF'],
-		[/^{[#!]{0,2}[\s]*?else}/, 'ELSE'],
-		[/^{[\s]*?\/if[\s]*?}/, 'IF_END'],
+		[/^{[#!]{0,2}if .+}/, 'IF'],
+		[/^{[#!]{0,2}else if .+}/, 'ELSEIF'],
+		[/^{[#!]{0,2}else}/, 'ELSE'],
+		[/^{[#!]{0,2}for .+}/, 'FOR'],
 
-		[/^{[#!]{0,2}[\s]*?for [\s\S]*?}/, 'FOR'],
-		[/^{[\s]*?\/for[\s]*?}/, 'FOR_END'],
+		[/^{\/if}/, 'IF_END'],
+		[/^{\/for}/, 'FOR_END'],
 
-		[/^{[#!]{0,2}[\s\S]*?}/, 'TAG'],
+		[/^{[#!]{0,2}.*?}/, 'TAG'],
 		[/^[\s\S]?/, 'TEXT'],
 	];
 
