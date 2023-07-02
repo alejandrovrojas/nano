@@ -37,11 +37,6 @@ import { Tokenizer } from './tokenizer.ts';
 import { NanoError } from './classes.ts';
 
 function ExpressionParser(input_expression: string, line_offset = 0) {
-	/**
-	 * 	@NOTE consider excluding keywords that are already
-	 * 	handled by the template parser such as if, for, else.
-	 * */
-
 	const expression_tokens: TokenSpec = [
 		[/^\s+/, null],
 		[/^<!--[\s\S]*?-->/, null],
