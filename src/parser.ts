@@ -17,6 +17,10 @@ import type {
 	NodeElse,
 	NodeFor,
 	NodeForStatement,
+	NodeSwitch,
+	NodeSwitchStatement,
+	NodeCase,
+	NodeCaseStatement,
 	NodeIdentifierList,
 	NodeConditionalExpression,
 	NodeLogicalExpression,
@@ -51,6 +55,8 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 		[/^\./, 'DOT'],
 
 		[/^\bimport\b/, 'IMPORT'],
+		[/^\bswitch\b/, 'SWITCH'],
+		[/^\bcase\b/, 'CASE'],
 		[/^\bwith\b/, 'WITH'],
 		[/^\bfor\b/, 'FOR'],
 		[/^\bin\b/, 'IN'],
@@ -114,6 +120,42 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 			type: 'ImportStatementArgument',
 			key: key.value,
 			value,
+		};
+	}
+
+	function CaseStatement(): NodeCaseStatement {
+		tokenizer.advance('CASE');
+
+		const test_list: NodeExpression[] = [];
+
+		if (tokenizer.next()) {
+			do {
+				const test_value = Expression();
+
+				if (test_value.type === 'Identifier' && test_value.value === 'default') {
+					return {
+						type: 'CaseStatement',
+						tests: null,
+					} as NodeCaseStatement;
+				}
+
+				test_list.push(test_value);
+			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
+		}
+
+		return {
+			type: 'CaseStatement',
+			tests: test_list,
+		};
+	}
+
+	function SwitchStatement(): NodeSwitchStatement {
+		tokenizer.advance('SWITCH');
+		const test = Expression();
+
+		return {
+			type: 'SwitchStatement',
+			test: test,
 		};
 	}
 
@@ -438,6 +480,8 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 		import_statement: ImportStatement,
 		if_statement: IfStatement,
 		for_statement: ForStatement,
+		switch_statement: SwitchStatement,
+		case_statement: CaseStatement,
 		expression: Expression,
 	};
 }
@@ -448,9 +492,9 @@ function TemplateParser(input_template: string) {
 		[/^<(style|script).*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
 		[/^{import .+}/, 'IMPORT'],
-		[/^{switch .+}/, 'SWITCH'],
-		[/^{case .+}/, 'CASE'],
 
+		[/^{[#!]{0,2}switch .+}/, 'SWITCH'],
+		[/^{[#!]{0,2}case .+}/, 'CASE'],
 		[/^{[#!]{0,2}if .+}/, 'IF'],
 		[/^{[#!]{0,2}else if .+}/, 'ELSEIF'],
 		[/^{[#!]{0,2}else}/, 'ELSE'],
@@ -473,6 +517,10 @@ function TemplateParser(input_template: string) {
 
 	function parse_token(token_type: string | undefined): NodeBlock | null {
 		switch (token_type) {
+			case 'SWITCH':
+				return Switch();
+			case 'CASE':
+				return Case();
 			case 'IMPORT':
 				return Import();
 			case 'IF':
@@ -511,6 +559,53 @@ function TemplateParser(input_template: string) {
 		return {
 			type: 'BlockList',
 			nodes: node_list,
+		};
+	}
+
+	function Switch(): NodeSwitch {
+		const token = tokenizer.advance('SWITCH');
+		const { flags, expression } = handle_statement_tag(token.value);
+		const statement = ExpressionParser(expression, tokenizer.line() - 1).switch_statement();
+		const cases: NodeCase[] = [];
+
+		while (tokenizer.next() && tokenizer.next()?.type !== 'SWITCH_END') {
+			const next_type = tokenizer.next()?.type;
+			const next_node = parse_token(next_type);
+
+			if (next_node && next_type === 'CASE') {
+				cases.push(next_node as NodeCase);
+			}
+		}
+
+		try {
+			tokenizer.advance('SWITCH_END');
+		} catch (error) {
+			throw new NanoError(`Missing {/switch} closing tag (line ${tokenizer.line()})`);
+		}
+
+		return {
+			type: 'Switch',
+			statement: statement,
+			cases: cases,
+		};
+	}
+
+	function Case(): NodeCase {
+		const token = tokenizer.advance('CASE');
+		const { flags, expression } = handle_statement_tag(token.value);
+		const statement = ExpressionParser(expression, tokenizer.line() - 1).case_statement();
+
+		const value = BlockList('CASE_END', flags);
+
+		try {
+			tokenizer.advance('CASE_END');
+		} catch (error) {
+			throw new NanoError(`Missing {/case} closing tag (line ${tokenizer.line()})`);
+		}
+		return {
+			type: 'Case',
+			statement: statement,
+			value: value,
 		};
 	}
 

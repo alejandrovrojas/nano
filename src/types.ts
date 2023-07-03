@@ -19,6 +19,8 @@ export type Node =
 /* prettier-ignore */
 export type NodeBlock =
 	| NodeImport
+	| NodeSwitch
+	| NodeCase
 	| NodeIf
 	| NodeElse
 	| NodeFor
@@ -47,6 +49,28 @@ export type NodeLiteral =
 export type NodeBlockList = {
 	type: 'BlockList';
 	nodes: NodeBlock[];
+};
+
+export type NodeSwitch = {
+	type: 'Switch';
+	statement: NodeSwitchStatement;
+	cases: NodeCase[];
+};
+
+export type NodeSwitchStatement = {
+	type: 'SwitchStatement';
+	test: NodeExpression;
+};
+
+export type NodeCase = {
+	type: 'Case';
+	statement: NodeCaseStatement;
+	value: NodeBlockList;
+};
+
+export type NodeCaseStatement = {
+	type: 'CaseStatement';
+	tests: NodeExpression[] | null;
 };
 
 export type NodeText = {
