@@ -1,5 +1,5 @@
 import { render } from '../src/renderer.ts';
-import { input_data } from './input_data.js';
+import { input_data } from './input_data.ts';
 
 try {
 	const input_template = Deno.readTextFileSync('tests/input_template.html');

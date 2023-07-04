@@ -17,6 +17,11 @@ import type {
 	NodeElse,
 	NodeFor,
 	NodeForStatement,
+	NodeSwitch,
+	NodeSwitchStatement,
+	NodeCase,
+	NodeCaseStatement,
+	NodeDefault,
 	NodeIdentifierList,
 	NodeConditionalExpression,
 	NodeLogicalExpression,
@@ -37,11 +42,6 @@ import { Tokenizer } from './tokenizer.ts';
 import { NanoError } from './classes.ts';
 
 function ExpressionParser(input_expression: string, line_offset = 0) {
-	/**
-	 * 	@NOTE consider excluding keywords that are already
-	 * 	handled by the template parser such as if, for, else.
-	 * */
-
 	const expression_tokens: TokenSpec = [
 		[/^\s+/, null],
 		[/^<!--[\s\S]*?-->/, null],
@@ -56,6 +56,8 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 		[/^\./, 'DOT'],
 
 		[/^\bimport\b/, 'IMPORT'],
+		[/^\bswitch\b/, 'SWITCH'],
+		[/^\bcase\b/, 'CASE'],
 		[/^\bwith\b/, 'WITH'],
 		[/^\bfor\b/, 'FOR'],
 		[/^\bin\b/, 'IN'],
@@ -119,6 +121,33 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 			type: 'ImportStatementArgument',
 			key: key.value,
 			value,
+		};
+	}
+
+	function CaseStatement(): NodeCaseStatement {
+		tokenizer.advance('CASE');
+
+		const test_list: NodeExpression[] = [];
+
+		if (tokenizer.next()) {
+			do {
+				test_list.push(Expression());
+			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
+		}
+
+		return {
+			type: 'CaseStatement',
+			tests: test_list,
+		};
+	}
+
+	function SwitchStatement(): NodeSwitchStatement {
+		tokenizer.advance('SWITCH');
+		const test = Expression();
+
+		return {
+			type: 'SwitchStatement',
+			test: test,
 		};
 	}
 
@@ -381,7 +410,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 			case 'NUMBER':
 				return NumericLiteral();
 			default:
-				throw new NanoError(`Unknown tag {${tokenizer.input()}} (line: ${tokenizer.line()})`);
+				throw new NanoError(`Unknown or invalid tag {${tokenizer.input()}} (line: ${tokenizer.line()})`);
 		}
 	}
 
@@ -443,6 +472,8 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 		import_statement: ImportStatement,
 		if_statement: IfStatement,
 		for_statement: ForStatement,
+		switch_statement: SwitchStatement,
+		case_statement: CaseStatement,
 		expression: Expression,
 	};
 }
@@ -450,19 +481,25 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 function TemplateParser(input_template: string) {
 	const template_tokens: TokenSpec = [
 		[/^<!--[\s\S]*?-->/, null],
-		[/^<(style|script)[\s\S]*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
+		[/^<(style|script).*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
-		[/^{[\s]*?import [\s\S]*?}/, 'IMPORT'],
+		[/^{import .+}/, 'IMPORT'],
+		[/^{default}/, 'DEFAULT'],
 
-		[/^{[#!]{0,2}[\s]*?if [\s\S]*?}/, 'IF'],
-		[/^{[#!]{0,2}[\s]*?else if [\s\S]*?}/, 'ELSEIF'],
-		[/^{[#!]{0,2}[\s]*?else}/, 'ELSE'],
-		[/^{[\s]*?\/if[\s]*?}/, 'IF_END'],
+		[/^{[#!]{0,2}switch .+}/, 'SWITCH'],
+		[/^{[#!]{0,2}case .+}/, 'CASE'],
+		[/^{[#!]{0,2}if .+}/, 'IF'],
+		[/^{[#!]{0,2}else if .+}/, 'ELSEIF'],
+		[/^{[#!]{0,2}else}/, 'ELSE'],
+		[/^{[#!]{0,2}for .+}/, 'FOR'],
 
-		[/^{[#!]{0,2}[\s]*?for [\s\S]*?}/, 'FOR'],
-		[/^{[\s]*?\/for[\s]*?}/, 'FOR_END'],
+		[/^{\/if}/, 'IF_END'],
+		[/^{\/for}/, 'FOR_END'],
+		[/^{\/switch}/, 'SWITCH_END'],
+		[/^{\/case}/, 'CASE_END'],
+		[/^{\/default}/, 'DEFAULT_END'],
 
-		[/^{[#!]{0,2}[\s\S]*?}/, 'TAG'],
+		[/^{[#!]{0,2}.*?}/, 'TAG'],
 		[/^[\s\S]?/, 'TEXT'],
 	];
 
@@ -474,6 +511,12 @@ function TemplateParser(input_template: string) {
 
 	function parse_token(token_type: string | undefined): NodeBlock | null {
 		switch (token_type) {
+			case 'SWITCH':
+				return Switch();
+			case 'CASE':
+				return Case();
+			case 'DEFAULT':
+				return Default();
 			case 'IMPORT':
 				return Import();
 			case 'IF':
@@ -512,6 +555,80 @@ function TemplateParser(input_template: string) {
 		return {
 			type: 'BlockList',
 			nodes: node_list,
+		};
+	}
+
+	function Switch(): NodeSwitch {
+		const token = tokenizer.advance('SWITCH');
+		const { flags, expression } = handle_statement_tag(token.value);
+		const statement = ExpressionParser(expression, tokenizer.line() - 1).switch_statement();
+
+		const cases: NodeCase[] = [];
+		let default_case: NodeDefault | null = null;
+
+		while (tokenizer.next() && tokenizer.next()?.type !== 'SWITCH_END') {
+			const next_type = tokenizer.next()?.type;
+			const next_node = parse_token(next_type);
+
+			if (next_node) {
+				if (next_type === 'CASE') {
+					cases.push(next_node as NodeCase);
+				}
+
+				if (next_type === 'DEFAULT') {
+					default_case = next_node as NodeDefault;
+				}
+			}
+		}
+
+		try {
+			tokenizer.advance('SWITCH_END');
+		} catch (error) {
+			throw new NanoError(`Missing {/switch} closing tag (line ${tokenizer.line()})`);
+		}
+
+		return {
+			type: 'Switch',
+			statement: statement,
+			cases: cases,
+			default: default_case,
+		};
+	}
+
+	function Case(): NodeCase {
+		const token = tokenizer.advance('CASE');
+		const { flags, expression } = handle_statement_tag(token.value);
+		const statement = ExpressionParser(expression, tokenizer.line() - 1).case_statement();
+
+		const value = BlockList('CASE_END', flags);
+
+		try {
+			tokenizer.advance('CASE_END');
+		} catch (error) {
+			throw new NanoError(`Missing {/case} closing tag (line ${tokenizer.line()})`);
+		}
+
+		return {
+			type: 'Case',
+			statement: statement,
+			value: value,
+		};
+	}
+
+	function Default(): NodeDefault {
+		const token = tokenizer.advance('DEFAULT');
+		const { flags, expression } = handle_statement_tag(token.value);
+		const value = BlockList('DEFAULT_END', flags);
+
+		try {
+			tokenizer.advance('DEFAULT_END');
+		} catch (error) {
+			throw new NanoError(`Missing {/default} closing tag (line ${tokenizer.line()})`);
+		}
+
+		return {
+			type: 'Default',
+			value: value,
 		};
 	}
 
