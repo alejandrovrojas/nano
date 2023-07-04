@@ -21,6 +21,7 @@ import type {
 	NodeSwitchStatement,
 	NodeCase,
 	NodeCaseStatement,
+	NodeDefault,
 	NodeIdentifierList,
 	NodeConditionalExpression,
 	NodeLogicalExpression,
@@ -130,16 +131,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 
 		if (tokenizer.next()) {
 			do {
-				const test_value = Expression();
-
-				if (test_value.type === 'Identifier' && test_value.value === 'default') {
-					return {
-						type: 'CaseStatement',
-						tests: null,
-					} as NodeCaseStatement;
-				}
-
-				test_list.push(test_value);
+				test_list.push(Expression());
 			} while (tokenizer.next() && tokenizer.next()?.type === 'COMMA' && tokenizer.advance('COMMA'));
 		}
 
@@ -492,6 +484,7 @@ function TemplateParser(input_template: string) {
 		[/^<(style|script).*?>[\s\S]*?<\/(script|style)>/, 'TEXT'],
 
 		[/^{import .+}/, 'IMPORT'],
+		[/^{default}/, 'DEFAULT'],
 
 		[/^{[#!]{0,2}switch .+}/, 'SWITCH'],
 		[/^{[#!]{0,2}case .+}/, 'CASE'],
@@ -504,6 +497,7 @@ function TemplateParser(input_template: string) {
 		[/^{\/for}/, 'FOR_END'],
 		[/^{\/switch}/, 'SWITCH_END'],
 		[/^{\/case}/, 'CASE_END'],
+		[/^{\/default}/, 'DEFAULT_END'],
 
 		[/^{[#!]{0,2}.*?}/, 'TAG'],
 		[/^[\s\S]?/, 'TEXT'],
@@ -521,6 +515,8 @@ function TemplateParser(input_template: string) {
 				return Switch();
 			case 'CASE':
 				return Case();
+			case 'DEFAULT':
+				return Default();
 			case 'IMPORT':
 				return Import();
 			case 'IF':
@@ -566,14 +562,22 @@ function TemplateParser(input_template: string) {
 		const token = tokenizer.advance('SWITCH');
 		const { flags, expression } = handle_statement_tag(token.value);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).switch_statement();
+
 		const cases: NodeCase[] = [];
+		let default_case: NodeDefault | null = null;
 
 		while (tokenizer.next() && tokenizer.next()?.type !== 'SWITCH_END') {
 			const next_type = tokenizer.next()?.type;
 			const next_node = parse_token(next_type);
 
-			if (next_node && next_type === 'CASE') {
-				cases.push(next_node as NodeCase);
+			if (next_node) {
+				if (next_type === 'CASE') {
+					cases.push(next_node as NodeCase);
+				}
+
+				if (next_type === 'DEFAULT') {
+					default_case = next_node as NodeDefault;
+				}
 			}
 		}
 
@@ -587,6 +591,7 @@ function TemplateParser(input_template: string) {
 			type: 'Switch',
 			statement: statement,
 			cases: cases,
+			default: default_case,
 		};
 	}
 
@@ -602,9 +607,27 @@ function TemplateParser(input_template: string) {
 		} catch (error) {
 			throw new NanoError(`Missing {/case} closing tag (line ${tokenizer.line()})`);
 		}
+
 		return {
 			type: 'Case',
 			statement: statement,
+			value: value,
+		};
+	}
+
+	function Default(): NodeDefault {
+		const token = tokenizer.advance('DEFAULT');
+		const { flags, expression } = handle_statement_tag(token.value);
+		const value = BlockList('DEFAULT_END', flags);
+
+		try {
+			tokenizer.advance('DEFAULT_END');
+		} catch (error) {
+			throw new NanoError(`Missing {/default} closing tag (line ${tokenizer.line()})`);
+		}
+
+		return {
+			type: 'Default',
 			value: value,
 		};
 	}

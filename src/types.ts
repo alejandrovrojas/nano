@@ -21,6 +21,7 @@ export type NodeBlock =
 	| NodeImport
 	| NodeSwitch
 	| NodeCase
+	| NodeDefault
 	| NodeIf
 	| NodeElse
 	| NodeFor
@@ -55,6 +56,7 @@ export type NodeSwitch = {
 	type: 'Switch';
 	statement: NodeSwitchStatement;
 	cases: NodeCase[];
+	default: NodeDefault | null;
 };
 
 export type NodeSwitchStatement = {
@@ -70,7 +72,12 @@ export type NodeCase = {
 
 export type NodeCaseStatement = {
 	type: 'CaseStatement';
-	tests: NodeExpression[] | null;
+	tests: NodeExpression[];
+};
+
+export type NodeDefault = {
+	type: 'Default';
+	value: NodeBlockList;
 };
 
 export type NodeText = {
