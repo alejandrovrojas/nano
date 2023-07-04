@@ -1,6 +1,6 @@
-{switch some.value}
-	{case "a", 20, 40, 80}
-		A
+{switch message}
+	{!case "hel" + "lo"}
+		{import 'tests/input_import.html' with (data: message)}
 	{/case}
 
 	{case 20}
