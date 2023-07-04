@@ -38,15 +38,15 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 		const test = await render_node(node.statement.test, node_data);
 
 		for await (const test_case of node.cases) {
-			const case_tests = await render_nodes(test_case.statement.tests);
+			const case_tests = await render_nodes(test_case.statement.tests, node_data);
 
 			if (case_tests.includes(test)) {
-				return render_node(test_case.value);
+				return render_node(test_case.value, node_data);
 			}
 		}
 
 		if (node.default) {
-			return render_node(node.default.value);
+			return render_node(node.default.value, node_data);
 		}
 
 		return '';
