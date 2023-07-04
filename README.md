@@ -105,6 +105,22 @@ _Result_
 {/for}
 ```
 
+```html
+{switch value}
+	{case "a", "b", "c"}
+		<!--match if value equals "a" or "b" or "c"-->
+	{/case}
+
+	{case 20 + 5}
+		<!--or if value equals 20 + 5 (or any other expression)-->
+	{/case}
+
+	{default}
+		<!--else-->
+	{/default}
+{/switch}
+```
+
 #### Imports
 
 ```html
