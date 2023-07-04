@@ -14,6 +14,7 @@ import type {
 	NodeIf,
 	NodeElse,
 	NodeFor,
+	NodeSwitch,
 	NodeConditionalExpression,
 	NodeLogicalExpression,
 	NodeBinaryExpression,
@@ -31,6 +32,24 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 	async function BlockList(node: NodeBlockList, node_data?: InputData): Promise<string> {
 		const rendered_nodes = await render_nodes(node.nodes, node_data);
 		return rendered_nodes.join('');
+	}
+
+	async function Switch(node: NodeSwitch, node_data?: InputData) {
+		const test = await render_node(node.statement.test, node_data);
+
+		for await (const test_case of node.cases) {
+			const case_tests = await render_nodes(test_case.statement.tests);
+
+			if (case_tests.includes(test)) {
+				return render_node(test_case.value);
+			}
+		}
+
+		if (node.default) {
+			return render_node(node.default.value);
+		}
+
+		return '';
 	}
 
 	async function Import(node: NodeImport, node_data?: InputData) {
@@ -285,6 +304,8 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 				return If(node, node_data);
 			case 'Else':
 				return Else(node, node_data);
+			case 'Switch':
+				return Switch(node, node_data);
 			case 'CallExpression':
 				return CallExpression(node, node_data);
 			case 'MemberExpression':
