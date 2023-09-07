@@ -369,11 +369,28 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 	}
 
 	function PrimaryExpression() {
-		switch (tokenizer.next()?.type) {
+		const next_type = tokenizer.next()?.type;
+
+		switch (next_type) {
 			case 'L_PARENTHESIS':
 				return ParenthesisExpression();
 			case 'IDENTIFIER':
 				return Identifier();
+			case 'IMPORT':
+			case 'SWITCH':
+			case 'CASE':
+			case 'WITH':
+			case 'FOR':
+			case 'IN':
+			case 'IF':
+				/**
+				 * @NOTE this makes sure that tags that match reserved keywords
+				 * such as {if}, {section}, {import}, etc. are parsed as
+				 * identifiers as opposed to blocks without arguments, in
+				 * cases when a data object is passed with property names that
+				 * match otherwise reserved keywords
+				 */
+				return Identifier(next_type);
 			default:
 				return Literal();
 		}
@@ -414,8 +431,8 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 		}
 	}
 
-	function Identifier(): NodeIdentifier {
-		const token = tokenizer.advance('IDENTIFIER');
+	function Identifier(keyword_identifier?: string): NodeIdentifier {
+		const token = tokenizer.advance(keyword_identifier || 'IDENTIFIER');
 
 		return {
 			type: 'Identifier',
