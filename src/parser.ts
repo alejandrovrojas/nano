@@ -386,9 +386,7 @@ function ExpressionParser(input_expression: string, line_offset = 0) {
 				/**
 				 * @NOTE this makes sure that tags that match reserved keywords
 				 * such as {if}, {section}, {import}, etc. are parsed as
-				 * identifiers as opposed to blocks without arguments, in
-				 * cases when a data object is passed with property names that
-				 * match otherwise reserved keywords
+				 * identifiers as opposed to blocks without arguments
 				 */
 				return Identifier(next_type);
 			default:
