@@ -575,7 +575,7 @@ function TemplateParser(input_template: string) {
 
 	function Switch(): NodeSwitch {
 		const token = tokenizer.advance('SWITCH');
-		const { flags, expression } = handle_statement_tag(token.value);
+		const { flags, expression } = handle_token_flags(token.value);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).switch_statement();
 
 		const cases: NodeCase[] = [];
@@ -612,7 +612,7 @@ function TemplateParser(input_template: string) {
 
 	function Case(): NodeCase {
 		const token = tokenizer.advance('CASE');
-		const { flags, expression } = handle_statement_tag(token.value);
+		const { flags, expression } = handle_token_flags(token.value);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).case_statement();
 
 		const value = BlockList('CASE_END', flags);
@@ -632,7 +632,7 @@ function TemplateParser(input_template: string) {
 
 	function Default(): NodeDefault {
 		const token = tokenizer.advance('DEFAULT');
-		const { flags, expression } = handle_statement_tag(token.value);
+		const { flags, expression } = handle_token_flags(token.value);
 		const value = BlockList('DEFAULT_END', flags);
 
 		try {
@@ -660,7 +660,7 @@ function TemplateParser(input_template: string) {
 
 	function For(): NodeFor {
 		const token = tokenizer.advance('FOR');
-		const { flags, expression } = handle_statement_tag(token.value);
+		const { flags, expression } = handle_token_flags(token.value);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).for_statement();
 		const value = BlockList('FOR_END', flags);
 
@@ -679,7 +679,7 @@ function TemplateParser(input_template: string) {
 
 	function If(token_type: 'IF' | 'ELSEIF' = 'IF'): NodeIf {
 		const token = tokenizer.advance(token_type);
-		const { flags, expression } = handle_statement_tag(token.value);
+		const { flags, expression } = handle_token_flags(token.value);
 		const statement = ExpressionParser(expression, tokenizer.line() - 1).if_statement();
 
 		const consequent: NodeBlockList = {
@@ -730,7 +730,7 @@ function TemplateParser(input_template: string) {
 
 	function Else(): NodeElse {
 		const token = tokenizer.advance('ELSE');
-		const { flags } = handle_statement_tag(token.value);
+		const { flags } = handle_token_flags(token.value);
 
 		return {
 			type: 'Else',
@@ -740,7 +740,7 @@ function TemplateParser(input_template: string) {
 
 	function Tag(): NodeTag {
 		const token = tokenizer.advance('TAG');
-		const { flags, expression } = handle_statement_tag(token.value);
+		const { flags, expression } = handle_token_flags(token.value, 'tag');
 		const value = ExpressionParser(expression, tokenizer.line() - 1).expression();
 
 		const tag_node: NodeTag = {
@@ -774,9 +774,14 @@ function TemplateParser(input_template: string) {
 		return null;
 	}
 
-	function handle_statement_tag(tag_string: string) {
-		const raw_string = tag_string.slice(1, -1);
-		const raw_flags_match = raw_string.match(/^[#!]{0,2}/);
+	function handle_token_flags(statement_string: string, flag_type: string = 'block') {
+		const flag_types = {
+			tag: /^[#]{0,1}/,
+			block: /^[#!]{0,2}/
+		}
+
+		const raw_string = statement_string.slice(1, -1);
+		const raw_flags_match = raw_string.match(flag_types[flag_type]);
 		const raw_flags = raw_flags_match ? raw_flags_match[0] : '';
 		const flags: NodeFlagList = raw_flags.split('');
 		const expression = raw_string.slice(flags.length);
