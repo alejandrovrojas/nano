@@ -29,6 +29,24 @@ const tests: Test[] = [
 		},
 	},
 	{
+		name: 'unary !tag',
+		input: '{!something}',
+		parsed: {
+			type: 'BlockList',
+			nodes: [
+				{
+					type: 'Tag',
+					value: {
+						type: 'UnaryExpression',
+						operator: '!',
+						value: { type: 'Identifier', value: 'something' },
+					},
+				},
+				{ type: 'Text', value: '\n' },
+			],
+		},
+	},
+	{
 		name: 'if else',
 		input: `{if this}A{else}B{/if}`,
 		parsed: {
