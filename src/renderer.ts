@@ -79,7 +79,7 @@ export function Renderer(input_template_parsed: NodeBlockList, input_data: Input
 				import_data[key] = value;
 			}
 
-			return render_node(parse(imported_file), import_data);
+			return render_node(parse(imported_file.trim()), import_data);
 		} catch (error) {
 			if (error.name === 'NotFound') {
 				throw new Error(`Imported file "${import_path}" could not be found.`);
